@@ -45,6 +45,59 @@ function lerpColor(c1, c2, t) {
     };
 }
 
+/** Convert RGB (0-255) to HSL (h: 0-360, s: 0-100, l: 0-100) */
+function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0;
+    const l = (max + min) / 2;
+    if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        else if (max === g) h = ((b - r) / d + 2) / 6;
+        else h = ((r - g) / d + 4) / 6;
+    }
+    return { h: h * 360, s: s * 100, l: l * 100 };
+}
+
+/** Shift hue of an RGB color by `degrees`, return new RGB */
+function hueShiftColor(rgb, degrees) {
+    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    const shifted = (hsl.h + degrees + 360) % 360;
+    return hslToRgb(shifted, hsl.s, hsl.l);
+}
+
+/**
+ * Multi-stop gradient: interpolate between an array of color stops.
+ * t should be 0-1. Returns {r, g, b}.
+ */
+function multiStopGradient(stops, t) {
+    t = Math.max(0, Math.min(1, t));
+    if (stops.length === 1) return stops[0];
+    const segment = t * (stops.length - 1);
+    const idx = Math.min(Math.floor(segment), stops.length - 2);
+    const local = segment - idx;
+    return lerpColor(stops[idx], stops[idx + 1], local);
+}
+
+/**
+ * Build a 5-stop vivid gradient from colorA and colorB.
+ * Produces: hueShift(A, -30) → A → bright midpoint → B → hueShift(B, +30)
+ */
+function buildVividStops(colorA, colorB) {
+    const midR = Math.min(255, Math.round((colorA.r + colorB.r) * 0.5 + 80));
+    const midG = Math.min(255, Math.round((colorA.g + colorB.g) * 0.5 + 80));
+    const midB = Math.min(255, Math.round((colorA.b + colorB.b) * 0.5 + 80));
+    return [
+        hueShiftColor(colorA, -30),
+        colorA,
+        { r: midR, g: midG, b: midB },
+        colorB,
+        hueShiftColor(colorB, 30),
+    ];
+}
+
 // ─── Tone Mapping ─────────────────────────────────────────────────────────────
 
 function toneMap(value, maxValue, mode) {
@@ -142,6 +195,14 @@ export function renderClassic(p, state) {
                     r = c.r; g = c.g; b = c.b;
                     break;
                 }
+                case 'vivid': {
+                    const stops = buildVividStops(colorA, colorB);
+                    const c = multiStopGradient(stops, t);
+                    r = Math.round(bg.r + (c.r - bg.r) * t);
+                    g = Math.round(bg.g + (c.g - bg.g) * t);
+                    b = Math.round(bg.b + (c.b - bg.b) * t);
+                    break;
+                }
                 default: {
                     r = Math.round(t * 255);
                     g = r; b = r;
@@ -215,14 +276,25 @@ export function renderParticles(p, state, frameCount) {
         initParticles(p, state);
     }
 
-    // Fade trail
+    // Fade trail — audio-reactive: bass + energy create motion blur trails
     const bg = hexToRgb(bgColor);
-    p.fill(bg.r, bg.g, bg.b, Math.round((1 - particleParams.trail) * 255));
+    const af_trail = state.audioFeatures;
+    let trailFade = (1 - particleParams.trail) * 255;
+    if (af_trail) {
+        // Bass reduces fade (more trail), energy amplifies the effect
+        trailFade *= Math.max(0.15, 1 - af_trail.bass * 0.6 - af_trail.energy * 0.3);
+    }
+    p.fill(bg.r, bg.g, bg.b, Math.round(trailFade));
     p.noStroke();
     p.rect(0, 0, p.width, p.height);
 
     const colorA = hexToRgb(colorParams.colorA);
     const colorB = hexToRgb(colorParams.colorB);
+
+    // Additive blending for vivid strand overlap
+    if (colorParams.blendMode === 'add') {
+        p.blendMode(p.ADD);
+    }
 
     p.noStroke();
 
@@ -266,21 +338,83 @@ export function renderParticles(p, state, frameCount) {
                 cr = c.r; cg = c.g; cb = c.b;
                 break;
             }
+            case 'vivid': {
+                const stops = buildVividStops(colorA, colorB);
+                const c = multiStopGradient(stops, (t + frameCount * 0.001) % 1.0);
+                cr = c.r; cg = c.g; cb = c.b;
+                break;
+            }
             default: {
                 cr = colorA.r; cg = colorA.g; cb = colorA.b;
             }
         }
 
-        const size = particleParams.size * (0.5 + Math.min(vel * 0.02, 2));
+        // ── Vivid audio-reactive effects ─────────────────────────────────────
+        const af = state.audioFeatures;
+        const td = state.timeDomainData;
+        let audioSizeMul = 1;
+        let audioGlowMul = 1;
+        let dispX = 0, dispY = 0;
+        let hueShift = 0;
+
+        if (af) {
+            // Explosive size pulse: bass drives size, beat adds burst
+            audioSizeMul = 1 + af.bass * 1.5 + af.beat * 1.2 + af.energy * 0.5;
+            // Dramatic glow: energy and treble amplify glow massively
+            audioGlowMul = 1 + af.energy * 3.0 + af.treble * 1.5;
+
+            // Spectral hue shift: bass rotates hue, treble spins faster
+            hueShift = af.bass * 40 + af.treble * 25 + af.beat * 30 + (state.audioColorShift || 0);
+
+            // Waveform displacement: use time-domain data to displace particles
+            if (td && td.length > 0) {
+                const sampleIdx = Math.floor(t * td.length) % td.length;
+                const sample = (td[sampleIdx] - 128) / 128; // -1 to 1
+                const displaceMag = af.energy * 60 + af.beat * 40;
+                // Displace perpendicular to particle motion
+                const angle = Math.atan2(dy, dx) + Math.PI * 0.5;
+                dispX = Math.cos(angle) * sample * displaceMag;
+                dispY = Math.sin(angle) * sample * displaceMag;
+            }
+        }
+
+        sx += dispX;
+        sy += dispY;
+
+        // Apply hue shift to color
+        if (hueShift !== 0) {
+            const shifted = hslToRgb(
+                (Math.atan2(cg - 128, cr - 128) * 180 / Math.PI + hueShift + 360) % 360,
+                80 + (af ? af.energy * 20 : 0),
+                50 + (af ? af.energy * 15 : 0)
+            );
+            cr = shifted.r; cg = shifted.g; cb = shifted.b;
+        }
+
+        const size = particleParams.size * (0.5 + Math.min(vel * 0.02, 2)) * audioSizeMul;
 
         if (particleParams.glow > 0) {
-            const glowSize = size * (2 + particleParams.glow);
-            p.fill(cr, cg, cb, Math.round(15 * particleParams.glow));
+            const glowSize = size * (2 + particleParams.glow) * audioGlowMul;
+            const glowAlpha = Math.round(15 * particleParams.glow * audioGlowMul);
+            p.fill(cr, cg, cb, Math.min(255, glowAlpha));
             p.ellipse(sx, sy, glowSize, glowSize);
         }
 
-        p.fill(cr, cg, cb, 200);
+        const coreAlpha = af ? Math.min(255, Math.round(200 + af.beat * 55 + af.energy * 30)) : 200;
+        p.fill(cr, cg, cb, coreAlpha);
         p.ellipse(sx, sy, size, size);
+
+        // Beat burst: extra bright ring on strong beats
+        if (af && af.beat > 0.5) {
+            const burstSize = size * (3 + af.beat * 4);
+            p.fill(255, 255, 255, Math.round(af.beat * 40));
+            p.ellipse(sx, sy, burstSize, burstSize);
+        }
+    }
+
+    // Reset blend mode
+    if (colorParams.blendMode === 'add') {
+        p.blendMode(p.BLEND);
     }
 }
 
@@ -344,6 +478,12 @@ function renderOrbitParticles(p, state, frameCount) {
             }
             case 'dual': {
                 const c = lerpColor(colorA, colorB, t);
+                cr = c.r; cg = c.g; cb = c.b;
+                break;
+            }
+            case 'vivid': {
+                const stops = buildVividStops(colorA, colorB);
+                const c = multiStopGradient(stops, (t + frameCount * 0.001) % 1.0);
                 cr = c.r; cg = c.g; cb = c.b;
                 break;
             }
@@ -416,13 +556,24 @@ export function renderVapor(p, state, frameCount) {
         initVapor(p, state);
     }
 
+    // Fade — audio-reactive: bass + energy create smoky trails
     const bg = hexToRgb(bgColor);
-    p.fill(bg.r, bg.g, bg.b, Math.round((1 - vaporParams.dissipation) * 255));
+    const af_trail = state.audioFeatures;
+    let dissipFade = (1 - vaporParams.dissipation) * 255;
+    if (af_trail) {
+        dissipFade *= Math.max(0.1, 1 - af_trail.bass * 0.5 - af_trail.energy * 0.4);
+    }
+    p.fill(bg.r, bg.g, bg.b, Math.round(dissipFade));
     p.noStroke();
     p.rect(0, 0, p.width, p.height);
 
     const colorA = hexToRgb(colorParams.colorA);
     const colorB = hexToRgb(colorParams.colorB);
+
+    // Additive blending for vivid strand overlap
+    if (colorParams.blendMode === 'add') {
+        p.blendMode(p.ADD);
+    }
 
     p.noStroke();
     const time = frameCount * 0.01;
@@ -437,11 +588,37 @@ export function renderVapor(p, state, frameCount) {
 
         const screen = toScreen(attractorType, vp.x, vp.y, vp.z, p.width, p.height);
 
-        const turbX = (p.noise(vp.x * 2 + time, vp.y * 2, i * 0.01) - 0.5) * vaporParams.turbulence * 30;
-        const turbY = (p.noise(vp.x * 2, vp.y * 2 + time, i * 0.01 + 100) - 0.5) * vaporParams.turbulence * 30;
+        // ── Vivid audio-reactive vapor modulation ────────────────────────────
+        const af = state.audioFeatures;
+        const td = state.timeDomainData;
+        let audioTurbMul = 1;
+        let audioPuffMul = 1;
+        let dispX = 0, dispY = 0;
+        let hueShift = 0;
 
-        let sx = screen.sx + turbX;
-        let sy = screen.sy + turbY;
+        if (af) {
+            // Massive turbulence: treble and energy drive chaotic motion
+            audioTurbMul = 1 + af.treble * 4.0 + af.energy * 2.0 + af.beat * 1.5;
+            // Dramatic puff scaling: energy + beat create explosive growth
+            audioPuffMul = 1 + af.energy * 1.5 + af.beat * 2.0 + af.bass * 0.8;
+            // Spectral hue cycling
+            hueShift = af.bass * 35 + af.treble * 20 + af.beat * 25;
+
+            // Waveform displacement for vapor
+            if (td && td.length > 0) {
+                const sampleIdx = Math.floor((i / vaporParticles.length) * td.length) % td.length;
+                const sample = (td[sampleIdx] - 128) / 128;
+                const displaceMag = af.energy * 50 + af.beat * 35;
+                dispX = sample * displaceMag * Math.cos(vp.age * 0.03 + i);
+                dispY = sample * displaceMag * Math.sin(vp.age * 0.03 + i);
+            }
+        }
+
+        const turbX = (p.noise(vp.x * 2 + time, vp.y * 2, i * 0.01) - 0.5) * vaporParams.turbulence * 30 * audioTurbMul;
+        const turbY = (p.noise(vp.x * 2, vp.y * 2 + time, i * 0.01 + 100) - 0.5) * vaporParams.turbulence * 30 * audioTurbMul;
+
+        let sx = screen.sx + turbX + dispX;
+        let sy = screen.sy + turbY + dispY;
 
         // Mouse interaction
         if (state.mouse.enabled && state.mouse.overCanvas) {
@@ -454,8 +631,10 @@ export function renderVapor(p, state, frameCount) {
         let cr, cg, cb;
         switch (colorParams.mode) {
             case 'spectral': {
-                const hue = (t * 280 + frameCount * 0.3) % 360;
-                const c = hslToRgb(hue, 70, 55);
+                const hue = (t * 280 + frameCount * 0.3 + hueShift) % 360;
+                const sat = 70 + (af ? af.energy * 30 : 0);
+                const lit = 55 + (af ? af.energy * 15 : 0);
+                const c = hslToRgb(hue, Math.min(100, sat), Math.min(80, lit));
                 cr = c.r; cg = c.g; cb = c.b;
                 break;
             }
@@ -464,19 +643,47 @@ export function renderVapor(p, state, frameCount) {
                 cr = c.r; cg = c.g; cb = c.b;
                 break;
             }
+            case 'vivid': {
+                const stops = buildVividStops(colorA, colorB);
+                const shiftT = (t + frameCount * 0.001 + (af ? af.energy * 0.1 : 0)) % 1.0;
+                const c = multiStopGradient(stops, shiftT);
+                cr = c.r; cg = c.g; cb = c.b;
+                break;
+            }
             default: {
                 cr = colorA.r; cg = colorA.g; cb = colorA.b;
             }
         }
 
-        const alpha = Math.max(5, 20 - vp.age * 0.02);
-        const puffSize = 6 + Math.sin(vp.age * 0.05 + i) * 3;
+        // Apply hue shift for non-spectral modes
+        if (hueShift !== 0 && colorParams.mode !== 'spectral') {
+            const shifted = hslToRgb(
+                (Math.atan2(cg - 128, cr - 128) * 180 / Math.PI + hueShift + 360) % 360,
+                80 + (af ? af.energy * 20 : 0),
+                50 + (af ? af.energy * 15 : 0)
+            );
+            cr = shifted.r; cg = shifted.g; cb = shifted.b;
+        }
+
+        const alpha = Math.max(5, Math.round((20 - vp.age * 0.02) * (af ? 1 + af.energy * 0.8 : 1)));
+        const puffSize = (6 + Math.sin(vp.age * 0.05 + i) * 3) * audioPuffMul;
 
         p.fill(cr, cg, cb, alpha);
         p.ellipse(sx, sy, puffSize, puffSize);
 
-        p.fill(cr, cg, cb, alpha * 0.3);
+        p.fill(cr, cg, cb, Math.round(alpha * 0.3));
         p.ellipse(sx, sy, puffSize * 3, puffSize * 3);
+
+        // Beat burst halo for vapor
+        if (af && af.beat > 0.5) {
+            p.fill(cr, cg, cb, Math.round(af.beat * 25));
+            p.ellipse(sx, sy, puffSize * 5, puffSize * 5);
+        }
+    }
+
+    // Reset blend mode
+    if (colorParams.blendMode === 'add') {
+        p.blendMode(p.BLEND);
     }
 
     if (vaporParams.blurPasses > 0) {
@@ -553,6 +760,12 @@ function renderOrbitVapor(p, state, frameCount) {
             }
             case 'dual': {
                 const c = lerpColor(colorA, colorB, t);
+                cr = c.r; cg = c.g; cb = c.b;
+                break;
+            }
+            case 'vivid': {
+                const stops = buildVividStops(colorA, colorB);
+                const c = multiStopGradient(stops, (t + frameCount * 0.001) % 1.0);
                 cr = c.r; cg = c.g; cb = c.b;
                 break;
             }

@@ -19,7 +19,10 @@
   <div id="app">
     <!-- Canvas Area -->
     <main id="canvas-area">
-      <div id="canvas-container"></div>
+      <div id="canvas-stage">
+        <div id="canvas-container"></div>
+        <canvas id="midi-keyboard-viz" style="display:none;"></canvas>
+      </div>
       <div id="fps-counter">0 FPS</div>
     </main>
 
@@ -41,6 +44,7 @@
             <button id="seed-random" class="btn btn-sm btn-accent" title="Random">⚡</button>
           </div>
           <div class="seed-jump">
+            <label for="seed-input" class="sr-only">Jump to seed</label>
             <input type="number" id="seed-input" placeholder="Jump to seed..." />
             <button id="seed-go" class="btn btn-sm">Go</button>
           </div>
@@ -50,6 +54,7 @@
         <section class="panel-section">
           <h2 class="section-title">Attractor Type</h2>
           <div class="control-group">
+            <label for="attractor-type" class="sr-only">Attractor type</label>
             <select id="attractor-type">
               <option value="dejong" selected>🦋 Peter de Jong</option>
               <option value="clifford">🌊 Clifford</option>
@@ -66,6 +71,7 @@
         <section class="panel-section">
           <h2 class="section-title">Canvas Size</h2>
           <div class="control-group">
+            <label for="canvas-aspect" class="sr-only">Canvas aspect ratio</label>
             <select id="canvas-aspect">
               <option value="1:1" selected>⬜ 1 : 1 (Square)</option>
               <option value="16:9">🖥️ 16 : 9 (Landscape)</option>
@@ -78,6 +84,7 @@
         <section class="panel-section">
           <h2 class="section-title">Symmetry</h2>
           <div class="control-group">
+            <label for="symmetry-folds" class="sr-only">Symmetry folds</label>
             <select id="symmetry-folds">
               <option value="1" selected>🔲 Off</option>
               <option value="2">🪞 2-fold</option>
@@ -98,19 +105,19 @@
         <section class="panel-section" id="dejong-coeffs">
           <h2 class="section-title">Coefficients (a, b, c, d)</h2>
           <div class="control-group">
-            <label>a <span class="value-display" id="val-a">-2.24</span></label>
+            <label for="coeff-a">a <span class="value-display" id="val-a">-2.24</span></label>
             <input type="range" id="coeff-a" min="-3.14" max="3.14" step="0.01" value="-2.24" />
           </div>
           <div class="control-group">
-            <label>b <span class="value-display" id="val-b">0.43</span></label>
+            <label for="coeff-b">b <span class="value-display" id="val-b">0.43</span></label>
             <input type="range" id="coeff-b" min="-3.14" max="3.14" step="0.01" value="0.43" />
           </div>
           <div class="control-group">
-            <label>c <span class="value-display" id="val-c">-0.65</span></label>
+            <label for="coeff-c">c <span class="value-display" id="val-c">-0.65</span></label>
             <input type="range" id="coeff-c" min="-3.14" max="3.14" step="0.01" value="-0.65" />
           </div>
           <div class="control-group">
-            <label>d <span class="value-display" id="val-d">-2.43</span></label>
+            <label for="coeff-d">d <span class="value-display" id="val-d">-2.43</span></label>
             <input type="range" id="coeff-d" min="-3.14" max="3.14" step="0.01" value="-2.43" />
           </div>
           <button id="randomize-btn" class="btn btn-full btn-accent">⚡ Randomize</button>
@@ -120,15 +127,15 @@
         <section class="panel-section" id="lorenz-coeffs" style="display:none;">
           <h2 class="section-title">Coefficients (σ, ρ, β)</h2>
           <div class="control-group">
-            <label>σ (sigma) <span class="value-display" id="val-sigma">10.00</span></label>
+            <label for="coeff-sigma">σ (sigma) <span class="value-display" id="val-sigma">10.00</span></label>
             <input type="range" id="coeff-sigma" min="0" max="30" step="0.1" value="10" />
           </div>
           <div class="control-group">
-            <label>ρ (rho) <span class="value-display" id="val-rho">28.00</span></label>
+            <label for="coeff-rho">ρ (rho) <span class="value-display" id="val-rho">28.00</span></label>
             <input type="range" id="coeff-rho" min="0" max="120" step="0.1" value="28" />
           </div>
           <div class="control-group">
-            <label>β (beta) <span class="value-display" id="val-beta">2.67</span></label>
+            <label for="coeff-beta">β (beta) <span class="value-display" id="val-beta">2.67</span></label>
             <input type="range" id="coeff-beta" min="0" max="10" step="0.01" value="2.667" />
           </div>
           <button id="randomize-lorenz-btn" class="btn btn-full btn-accent">⚡ Randomize</button>
@@ -138,19 +145,19 @@
         <section class="panel-section" id="clifford-coeffs" style="display:none;">
           <h2 class="section-title">Coefficients (a, b, c, d)</h2>
           <div class="control-group">
-            <label>a <span class="value-display" id="val-cliff-a">-1.40</span></label>
+            <label for="coeff-cliff-a">a <span class="value-display" id="val-cliff-a">-1.40</span></label>
             <input type="range" id="coeff-cliff-a" min="-3" max="3" step="0.01" value="-1.4" />
           </div>
           <div class="control-group">
-            <label>b <span class="value-display" id="val-cliff-b">1.60</span></label>
+            <label for="coeff-cliff-b">b <span class="value-display" id="val-cliff-b">1.60</span></label>
             <input type="range" id="coeff-cliff-b" min="-3" max="3" step="0.01" value="1.6" />
           </div>
           <div class="control-group">
-            <label>c <span class="value-display" id="val-cliff-c">1.00</span></label>
+            <label for="coeff-cliff-c">c <span class="value-display" id="val-cliff-c">1.00</span></label>
             <input type="range" id="coeff-cliff-c" min="-2" max="2" step="0.01" value="1.0" />
           </div>
           <div class="control-group">
-            <label>d <span class="value-display" id="val-cliff-d">0.70</span></label>
+            <label for="coeff-cliff-d">d <span class="value-display" id="val-cliff-d">0.70</span></label>
             <input type="range" id="coeff-cliff-d" min="-2" max="2" step="0.01" value="0.7" />
           </div>
           <button id="randomize-clifford-btn" class="btn btn-full btn-accent">⚡ Randomize</button>
@@ -160,27 +167,27 @@
         <section class="panel-section" id="aizawa-coeffs" style="display:none;">
           <h2 class="section-title">Coefficients (a, b, c, d, e, f)</h2>
           <div class="control-group">
-            <label>a <span class="value-display" id="val-aiz-a">0.95</span></label>
+            <label for="coeff-aiz-a">a <span class="value-display" id="val-aiz-a">0.95</span></label>
             <input type="range" id="coeff-aiz-a" min="0.1" max="2.0" step="0.01" value="0.95" />
           </div>
           <div class="control-group">
-            <label>b <span class="value-display" id="val-aiz-b">0.70</span></label>
+            <label for="coeff-aiz-b">b <span class="value-display" id="val-aiz-b">0.70</span></label>
             <input type="range" id="coeff-aiz-b" min="0.1" max="1.5" step="0.01" value="0.7" />
           </div>
           <div class="control-group">
-            <label>c <span class="value-display" id="val-aiz-c">0.60</span></label>
+            <label for="coeff-aiz-c">c <span class="value-display" id="val-aiz-c">0.60</span></label>
             <input type="range" id="coeff-aiz-c" min="0.1" max="1.5" step="0.01" value="0.6" />
           </div>
           <div class="control-group">
-            <label>d <span class="value-display" id="val-aiz-d">3.50</span></label>
+            <label for="coeff-aiz-d">d <span class="value-display" id="val-aiz-d">3.50</span></label>
             <input type="range" id="coeff-aiz-d" min="1.0" max="6.0" step="0.1" value="3.5" />
           </div>
           <div class="control-group">
-            <label>e <span class="value-display" id="val-aiz-e">0.25</span></label>
+            <label for="coeff-aiz-e">e <span class="value-display" id="val-aiz-e">0.25</span></label>
             <input type="range" id="coeff-aiz-e" min="0.01" max="1.0" step="0.01" value="0.25" />
           </div>
           <div class="control-group">
-            <label>f <span class="value-display" id="val-aiz-f">0.10</span></label>
+            <label for="coeff-aiz-f">f <span class="value-display" id="val-aiz-f">0.10</span></label>
             <input type="range" id="coeff-aiz-f" min="0.01" max="0.5" step="0.01" value="0.1" />
           </div>
           <button id="randomize-aizawa-btn" class="btn btn-full btn-accent">⚡ Randomize</button>
@@ -190,27 +197,27 @@
         <section class="panel-section" id="buddhabrot-coeffs" style="display:none;">
           <h2 class="section-title">Parameters</h2>
           <div class="control-group">
-            <label>Max Iterations <span class="value-display" id="val-bb-maxiter">200</span></label>
+            <label for="bb-maxiter">Max Iterations <span class="value-display" id="val-bb-maxiter">200</span></label>
             <input type="range" id="bb-maxiter" min="10" max="5000" step="10" value="200" />
           </div>
           <div class="control-group">
-            <label>Samples <span class="value-display" id="val-bb-samples">500K</span></label>
+            <label for="bb-samples">Samples <span class="value-display" id="val-bb-samples">500K</span></label>
             <input type="range" id="bb-samples" min="4" max="6.5" step="0.1" value="5.7" />
           </div>
           <div class="control-group toggle-row">
-            <label>Anti-Buddhabrot</label>
+            <label for="bb-anti">Anti-Buddhabrot</label>
             <input type="checkbox" id="bb-anti" />
           </div>
           <div class="control-group">
-            <label>Zoom <span class="value-display" id="val-bb-zoom">1.00</span></label>
+            <label for="bb-zoom">Zoom <span class="value-display" id="val-bb-zoom">1.00</span></label>
             <input type="range" id="bb-zoom" min="0.3" max="8" step="0.1" value="1.0" />
           </div>
           <div class="control-group">
-            <label>Center X <span class="value-display" id="val-bb-cx">-0.50</span></label>
+            <label for="bb-center-x">Center X <span class="value-display" id="val-bb-cx">-0.50</span></label>
             <input type="range" id="bb-center-x" min="-2" max="1" step="0.01" value="-0.5" />
           </div>
           <div class="control-group">
-            <label>Center Y <span class="value-display" id="val-bb-cy">0.00</span></label>
+            <label for="bb-center-y">Center Y <span class="value-display" id="val-bb-cy">0.00</span></label>
             <input type="range" id="bb-center-y" min="-1.5" max="1.5" step="0.01" value="0" />
           </div>
         </section>
@@ -219,27 +226,27 @@
         <section class="panel-section" id="burningship-coeffs" style="display:none;">
           <h2 class="section-title">Parameters</h2>
           <div class="control-group">
-            <label>Max Iterations <span class="value-display" id="val-bs-maxiter">200</span></label>
+            <label for="bs-maxiter">Max Iterations <span class="value-display" id="val-bs-maxiter">200</span></label>
             <input type="range" id="bs-maxiter" min="10" max="5000" step="10" value="200" />
           </div>
           <div class="control-group">
-            <label>Samples <span class="value-display" id="val-bs-samples">500K</span></label>
+            <label for="bs-samples">Samples <span class="value-display" id="val-bs-samples">500K</span></label>
             <input type="range" id="bs-samples" min="4" max="6.5" step="0.1" value="5.7" />
           </div>
           <div class="control-group toggle-row">
-            <label>Anti-Ship</label>
+            <label for="bs-anti">Anti-Ship</label>
             <input type="checkbox" id="bs-anti" />
           </div>
           <div class="control-group">
-            <label>Zoom <span class="value-display" id="val-bs-zoom">1.00</span></label>
+            <label for="bs-zoom">Zoom <span class="value-display" id="val-bs-zoom">1.00</span></label>
             <input type="range" id="bs-zoom" min="0.3" max="8" step="0.1" value="1.0" />
           </div>
           <div class="control-group">
-            <label>Center X <span class="value-display" id="val-bs-cx">-0.40</span></label>
+            <label for="bs-center-x">Center X <span class="value-display" id="val-bs-cx">-0.40</span></label>
             <input type="range" id="bs-center-x" min="-2" max="1" step="0.01" value="-0.4" />
           </div>
           <div class="control-group">
-            <label>Center Y <span class="value-display" id="val-bs-cy">-0.60</span></label>
+            <label for="bs-center-y">Center Y <span class="value-display" id="val-bs-cy">-0.60</span></label>
             <input type="range" id="bs-center-y" min="-1.5" max="1.5" step="0.01" value="-0.6" />
           </div>
         </section>
@@ -248,23 +255,23 @@
         <section class="panel-section" id="curlnoise-coeffs" style="display:none;">
           <h2 class="section-title">Flow Field Parameters</h2>
           <div class="control-group">
-            <label>Noise Scale <span class="value-display" id="val-cn-scale">1.50</span></label>
+            <label for="cn-scale">Noise Scale <span class="value-display" id="val-cn-scale">1.50</span></label>
             <input type="range" id="cn-scale" min="0.3" max="5.0" step="0.1" value="1.5" />
           </div>
           <div class="control-group">
-            <label>Octaves <span class="value-display" id="val-cn-octaves">4</span></label>
+            <label for="cn-octaves">Octaves <span class="value-display" id="val-cn-octaves">4</span></label>
             <input type="range" id="cn-octaves" min="1" max="8" step="1" value="4" />
           </div>
           <div class="control-group">
-            <label>Lacunarity <span class="value-display" id="val-cn-lacunarity">2.00</span></label>
+            <label for="cn-lacunarity">Lacunarity <span class="value-display" id="val-cn-lacunarity">2.00</span></label>
             <input type="range" id="cn-lacunarity" min="1.0" max="4.0" step="0.1" value="2.0" />
           </div>
           <div class="control-group">
-            <label>Gain <span class="value-display" id="val-cn-gain">0.50</span></label>
+            <label for="cn-gain">Gain <span class="value-display" id="val-cn-gain">0.50</span></label>
             <input type="range" id="cn-gain" min="0.1" max="0.9" step="0.05" value="0.5" />
           </div>
           <div class="control-group">
-            <label>Speed <span class="value-display" id="val-cn-speed">0.50</span></label>
+            <label for="cn-speed">Speed <span class="value-display" id="val-cn-speed">0.50</span></label>
             <input type="range" id="cn-speed" min="0.05" max="2.0" step="0.05" value="0.5" />
           </div>
           <button id="randomize-curlnoise-btn" class="btn btn-full btn-accent">⚡ Randomize</button>
@@ -274,6 +281,7 @@
         <section class="panel-section">
           <h2 class="section-title">Render Mode</h2>
           <div class="control-group">
+            <label for="render-mode" class="sr-only">Render mode</label>
             <select id="render-mode">
               <option value="classic" selected>🎨 Classic (Density)</option>
               <option value="particles">✨ Particles</option>
@@ -284,11 +292,11 @@
           <!-- Classic sub-controls -->
           <div id="classic-controls" class="sub-controls">
             <div class="control-group">
-              <label>Iterations <span class="value-display" id="val-iterations">500K</span></label>
+              <label for="iterations">Iterations <span class="value-display" id="val-iterations">500K</span></label>
               <input type="range" id="iterations" min="4" max="7" step="0.1" value="5.7" />
             </div>
             <div class="control-group">
-              <label>Density Map</label>
+              <label for="density-mode">Density Map</label>
               <select id="density-mode">
                 <option value="sqrt" selected>Square Root</option>
                 <option value="log">Logarithmic</option>
@@ -300,19 +308,19 @@
           <!-- Particle sub-controls -->
           <div id="particle-controls" class="sub-controls" style="display:none;">
             <div class="control-group">
-              <label>Particle Count <span class="value-display" id="val-pcount">2000</span></label>
+              <label for="particle-count">Particle Count <span class="value-display" id="val-pcount">2000</span></label>
               <input type="range" id="particle-count" min="200" max="8000" step="100" value="2000" />
             </div>
             <div class="control-group">
-              <label>Trail Length <span class="value-display" id="val-trail">0.92</span></label>
+              <label for="trail-length">Trail Length <span class="value-display" id="val-trail">0.92</span></label>
               <input type="range" id="trail-length" min="0.5" max="0.99" step="0.01" value="0.92" />
             </div>
             <div class="control-group">
-              <label>Glow Intensity <span class="value-display" id="val-glow">1.5</span></label>
+              <label for="glow-intensity">Glow Intensity <span class="value-display" id="val-glow">1.5</span></label>
               <input type="range" id="glow-intensity" min="0" max="4" step="0.1" value="1.5" />
             </div>
             <div class="control-group">
-              <label>Point Size <span class="value-display" id="val-psize">2.0</span></label>
+              <label for="particle-size">Point Size <span class="value-display" id="val-psize">2.0</span></label>
               <input type="range" id="particle-size" min="0.5" max="6" step="0.1" value="2.0" />
             </div>
           </div>
@@ -320,19 +328,19 @@
           <!-- Vapor sub-controls -->
           <div id="vapor-controls" class="sub-controls" style="display:none;">
             <div class="control-group">
-              <label>Particle Count <span class="value-display" id="val-vpcount">3000</span></label>
+              <label for="vapor-count">Particle Count <span class="value-display" id="val-vpcount">3000</span></label>
               <input type="range" id="vapor-count" min="500" max="10000" step="100" value="3000" />
             </div>
             <div class="control-group">
-              <label>Blur Passes <span class="value-display" id="val-blur">3</span></label>
+              <label for="blur-passes">Blur Passes <span class="value-display" id="val-blur">3</span></label>
               <input type="range" id="blur-passes" min="0" max="8" step="1" value="3" />
             </div>
             <div class="control-group">
-              <label>Turbulence <span class="value-display" id="val-turb">0.4</span></label>
+              <label for="turbulence">Turbulence <span class="value-display" id="val-turb">0.4</span></label>
               <input type="range" id="turbulence" min="0" max="1" step="0.01" value="0.4" />
             </div>
             <div class="control-group">
-              <label>Dissipation <span class="value-display" id="val-dissipation">0.96</span></label>
+              <label for="dissipation">Dissipation <span class="value-display" id="val-dissipation">0.96</span></label>
               <input type="range" id="dissipation" min="0.85" max="0.99" step="0.01" value="0.96" />
             </div>
           </div>
@@ -342,26 +350,34 @@
         <section class="panel-section">
           <h2 class="section-title">Colors</h2>
           <div class="control-group">
-            <label>Color Mode</label>
+            <label for="color-mode">Color Mode</label>
             <select id="color-mode">
               <option value="spectral" selected>🌈 Spectral</option>
               <option value="dual">🎭 Dual Blend</option>
+              <option value="vivid">🔮 Vivid (Multi-Gradient)</option>
               <option value="single">🔵 Single Color</option>
             </select>
           </div>
           <div id="color-pickers" class="color-picker-row">
             <div class="control-group">
-              <label>Color A</label>
+              <label for="color-a">Color A</label>
               <input type="color" id="color-a" value="#00d4ff" />
             </div>
             <div class="control-group">
-              <label>Color B</label>
+              <label for="color-b">Color B</label>
               <input type="color" id="color-b" value="#ff006e" />
             </div>
           </div>
           <div class="control-group">
-            <label>Background</label>
+            <label for="bg-color">Background</label>
             <input type="color" id="bg-color" value="#0a0a0f" />
+          </div>
+          <div class="control-group" id="blend-mode-group" style="display:none;">
+            <label for="blend-mode">Blend Mode</label>
+            <select id="blend-mode">
+              <option value="normal" selected>🎨 Normal</option>
+              <option value="add">✨ Additive</option>
+            </select>
           </div>
           <div class="palette-section">
             <label class="palette-label">Palettes</label>
@@ -373,11 +389,11 @@
         <section class="panel-section">
           <h2 class="section-title">Diffusion</h2>
           <div class="control-group toggle-row">
-            <label>Enable</label>
+            <label for="diffusion-toggle">Enable</label>
             <input type="checkbox" id="diffusion-toggle" />
           </div>
           <div class="control-group">
-            <label>Strength <span class="value-display" id="val-diffusion">1.5</span></label>
+            <label for="diffusion-strength">Strength <span class="value-display" id="val-diffusion">1.5</span></label>
             <input type="range" id="diffusion-strength" min="0.5" max="5" step="0.1" value="1.5" />
           </div>
         </section>
@@ -386,15 +402,15 @@
         <section class="panel-section">
           <h2 class="section-title">Mouse Interaction</h2>
           <div class="control-group toggle-row">
-            <label>Enable</label>
+            <label for="mouse-toggle">Enable</label>
             <input type="checkbox" id="mouse-toggle" />
           </div>
           <div class="control-group">
-            <label>Strength <span class="value-display" id="val-mouse-strength">0.50</span></label>
+            <label for="mouse-strength">Strength <span class="value-display" id="val-mouse-strength">0.50</span></label>
             <input type="range" id="mouse-strength" min="0.05" max="2.0" step="0.05" value="0.5" />
           </div>
           <div class="control-group">
-            <label>Mode</label>
+            <label for="mouse-mode">Mode</label>
             <select id="mouse-mode">
               <option value="attract" selected>🧲 Attract</option>
               <option value="repel">💥 Repel</option>
@@ -407,11 +423,11 @@
         <section class="panel-section">
           <h2 class="section-title">Animation</h2>
           <div class="control-group toggle-row">
-            <label>Auto Animate</label>
+            <label for="auto-animate">Auto Animate</label>
             <input type="checkbox" id="auto-animate" />
           </div>
           <div class="control-group">
-            <label>Speed <span class="value-display" id="val-speed">0.003</span></label>
+            <label for="anim-speed">Speed <span class="value-display" id="val-speed">0.003</span></label>
             <input type="range" id="anim-speed" min="0.0005" max="0.02" step="0.0005" value="0.003" />
           </div>
           <div class="anim-controls">
@@ -431,8 +447,54 @@
           <button id="btn-stop-listen" class="btn btn-full btn-danger" style="display:none">⏹ Stop Listening</button>
           <canvas id="audio-visualizer" width="280" height="40"></canvas>
           <div class="control-group" style="margin-top: 10px;">
-            <label>Sensitivity <span class="value-display" id="val-sensitivity">1.00</span></label>
+            <label for="audio-sensitivity">Sensitivity <span class="value-display"
+                id="val-sensitivity">1.00</span></label>
             <input type="range" id="audio-sensitivity" min="0.1" max="3.0" step="0.05" value="1.0" />
+          </div>
+          <div class="control-group" style="margin-top: 10px;">
+            <label>
+              <input type="checkbox" id="waveform-toggle" /> Waveform Overlay
+            </label>
+          </div>
+          <div class="control-group" id="waveform-style-group" style="display:none; margin-top: 6px;">
+            <label for="waveform-style">Style</label>
+            <select id="waveform-style">
+              <option value="oscilloscope">Oscilloscope</option>
+              <option value="mirrored">Mirrored</option>
+              <option value="circular">Circular</option>
+              <option value="bars">Bars</option>
+              <option value="radial">Radial</option>
+            </select>
+          </div>
+          <div class="control-group" id="waveform-intensity-group" style="display:none; margin-top: 6px;">
+            <label for="waveform-intensity">Intensity <span class="value-display"
+                id="val-waveform-intensity">0.70</span></label>
+            <input type="range" id="waveform-intensity" min="0.1" max="1.0" step="0.05" value="0.7" />
+          </div>
+
+          <!-- MIDI Keyboard -->
+          <div class="control-group midi-section"
+            style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);">
+            <label for="midi-toggle">MIDI Keyboard</label>
+            <div class="midi-toggle-row">
+              <input type="checkbox" id="midi-toggle" />
+              <span class="midi-status-dot" id="midi-status-dot"></span>
+              <span class="midi-status-text" id="midi-status-text">Off</span>
+            </div>
+          </div>
+          <div id="midi-controls" style="display:none">
+            <div class="control-group">
+              <label for="midi-waveform">Waveform</label>
+              <select id="midi-waveform">
+                <option value="sawtooth">🔶 Sawtooth</option>
+                <option value="square">⬛ Square</option>
+                <option value="sine">🔵 Sine</option>
+                <option value="triangle">🔺 Triangle</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label>Device <span class="value-display" id="midi-device-name">—</span></label>
+            </div>
           </div>
         </section>
 
@@ -441,47 +503,50 @@
           <h2 class="section-title">Post-Processing</h2>
 
           <div class="control-group toggle-row">
-            <label>Bloom</label>
+            <label for="pp-bloom">Bloom</label>
             <input type="checkbox" id="pp-bloom" />
           </div>
           <div class="control-group">
-            <label>Strength <span class="value-display" id="val-pp-bloom">0.50</span></label>
+            <label for="pp-bloom-strength">Strength <span class="value-display" id="val-pp-bloom">0.50</span></label>
             <input type="range" id="pp-bloom-strength" min="0" max="1" step="0.05" value="0.5" />
           </div>
 
           <div class="control-group toggle-row">
-            <label>Chromatic Aberration</label>
+            <label for="pp-chromatic">Chromatic Aberration</label>
             <input type="checkbox" id="pp-chromatic" />
           </div>
           <div class="control-group">
-            <label>Strength <span class="value-display" id="val-pp-chromatic">0.50</span></label>
+            <label for="pp-chromatic-strength">Strength <span class="value-display"
+                id="val-pp-chromatic">0.50</span></label>
             <input type="range" id="pp-chromatic-strength" min="0" max="1" step="0.05" value="0.5" />
           </div>
 
           <div class="control-group toggle-row">
-            <label>Vignette</label>
+            <label for="pp-vignette">Vignette</label>
             <input type="checkbox" id="pp-vignette" />
           </div>
           <div class="control-group">
-            <label>Strength <span class="value-display" id="val-pp-vignette">0.50</span></label>
+            <label for="pp-vignette-strength">Strength <span class="value-display"
+                id="val-pp-vignette">0.50</span></label>
             <input type="range" id="pp-vignette-strength" min="0" max="1" step="0.05" value="0.5" />
           </div>
 
           <div class="control-group toggle-row">
-            <label>Film Grain</label>
+            <label for="pp-grain">Film Grain</label>
             <input type="checkbox" id="pp-grain" />
           </div>
           <div class="control-group">
-            <label>Strength <span class="value-display" id="val-pp-grain">0.30</span></label>
+            <label for="pp-grain-strength">Strength <span class="value-display" id="val-pp-grain">0.30</span></label>
             <input type="range" id="pp-grain-strength" min="0" max="1" step="0.05" value="0.3" />
           </div>
 
           <div class="control-group toggle-row">
-            <label>Scanlines</label>
+            <label for="pp-scanlines">Scanlines</label>
             <input type="checkbox" id="pp-scanlines" />
           </div>
           <div class="control-group">
-            <label>Strength <span class="value-display" id="val-pp-scanlines">0.40</span></label>
+            <label for="pp-scanlines-strength">Strength <span class="value-display"
+                id="val-pp-scanlines">0.40</span></label>
             <input type="range" id="pp-scanlines-strength" min="0" max="1" step="0.05" value="0.4" />
           </div>
         </section>

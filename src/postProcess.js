@@ -102,7 +102,15 @@ export function applyPostProcessing(p5Canvas, pp) {
 // ─── Bloom ────────────────────────────────────────────────────────────────────
 
 function applyBloom(c, sourceCanvas, w, h, strength) {
-    // Draw blurred copy with screen blending
+    // Pass 1: HDR core glow — tight radius, high brightness for hot inner halos
+    c.save();
+    c.globalCompositeOperation = 'screen';
+    c.globalAlpha = strength * 0.3;
+    c.filter = `blur(${Math.round(3 + strength * 5)}px) brightness(${1.5 + strength * 1.0})`;
+    c.drawImage(sourceCanvas, 0, 0, w, h);
+    c.restore();
+
+    // Pass 2: Medium glow
     c.save();
     c.globalCompositeOperation = 'screen';
     c.globalAlpha = strength * 0.45;
@@ -110,7 +118,7 @@ function applyBloom(c, sourceCanvas, w, h, strength) {
     c.drawImage(sourceCanvas, 0, 0, w, h);
     c.restore();
 
-    // Second softer pass for wider glow
+    // Pass 3: Wide soft glow
     c.save();
     c.globalCompositeOperation = 'screen';
     c.globalAlpha = strength * 0.2;

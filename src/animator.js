@@ -75,7 +75,8 @@ export class Animator {
         // ── Color Shift (audio-driven hue offset) ─────────────────────────────
         if (hasAudio) {
             const a = this.audioConfig;
-            this.colorShift = (a.beat * 30 + a.energy * 15 + a.treble * 10) * sens;
+            // Vivid color cycling: hue shifts dramatically with beat + treble
+            this.colorShift = (a.beat * 60 + a.energy * 30 + a.treble * 20 + a.bass * 15) * sens;
         } else {
             this.colorShift *= 0.9; // Decay to zero
         }
@@ -95,25 +96,25 @@ export class Animator {
                     const a = this.audioConfig;
                     const energy = a.energy;
 
-                    // Bass → large-scale morph (coeffs a/sigma)
+                    // Bass → dramatic large-scale morph
                     if (key === 'a' || key === 'sigma') {
-                        val += a.bass * 0.6 * energy * sens;
+                        val += a.bass * 1.2 * energy * sens;
                     }
-                    // Mids → medium detail (coeffs b/rho)
+                    // Mids → strong medium detail warping
                     if (key === 'b' || key === 'rho') {
-                        val += a.mid * 0.4 * energy * sens;
+                        val += a.mid * 0.8 * energy * sens;
                     }
-                    // Treble → fine structure (coeffs c/beta)
+                    // Treble → visible fine structure shifts
                     if (key === 'c' || key === 'beta') {
-                        val += a.treble * 0.25 * energy * sens;
+                        val += a.treble * 0.5 * energy * sens;
                     }
-                    // Beat → pulse on coeff d
+                    // Beat → punch ALL coefficients for explosive morph
                     if (key === 'd') {
-                        val += a.beat * 0.5 * energy * sens;
+                        val += a.beat * 1.0 * energy * sens;
                     }
-                    // Buddhabrot keys
+                    // Zoom breathing: bass + beat pulse zoom in/out
                     if (key === 'zoom') {
-                        val += a.beat * 0.3 * sens;
+                        val += (a.bass * 0.5 + a.beat * 0.4) * sens;
                     }
                 }
 

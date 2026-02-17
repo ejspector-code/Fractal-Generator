@@ -12,7 +12,7 @@
   --border-accent: rgba(0, 212, 255, 0.3);
   --text-primary: #e8e8ec;
   --text-secondary: #8888a0;
-  --text-dim: #555566;
+  --text-dim: #7a7a8c;
   --accent: #00d4ff;
   --accent-glow: rgba(0, 212, 255, 0.2);
   --accent-secondary: #ff006e;
@@ -47,6 +47,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Screen reader only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 /* Layout */
 #app {
   display: flex;
@@ -66,6 +79,12 @@ body {
 
 #canvas-container {
   position: relative;
+}
+
+#canvas-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 #canvas-container canvas {
@@ -274,6 +293,10 @@ select:focus {
   border-color: var(--border-accent);
 }
 
+select:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
 /* Text inputs */
 input[type="number"],
 input[type="text"] {
@@ -289,8 +312,14 @@ input[type="text"] {
   transition: border-color var(--transition);
 }
 
-input[type="number"]:focus {
+input[type="number"]:focus,
+input[type="text"]:focus {
   border-color: var(--border-accent);
+}
+
+input[type="number"]:focus-visible,
+input[type="text"]:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 /* Color inputs */
@@ -367,6 +396,11 @@ input[type="checkbox"]:checked::after {
   cursor: pointer;
   transition: all var(--transition);
   outline: none;
+}
+
+.btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+  border-color: var(--accent);
 }
 
 .btn:hover {
@@ -499,6 +533,63 @@ input[type="checkbox"]:checked::after {
   border-radius: 4px;
 }
 
+/* MIDI Controls */
+.midi-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.midi-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: all 0.3s ease;
+}
+
+.midi-status-dot.active {
+  background: #00ff88;
+  box-shadow: 0 0 6px #00ff88;
+}
+
+.midi-status-dot.error {
+  background: #ff4444;
+  box-shadow: 0 0 6px #ff4444;
+}
+
+.midi-status-dot.connecting {
+  background: #ffaa00;
+  animation: pulse-dot 1s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.midi-status-text {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+#midi-keyboard-viz {
+  width: 100%;
+  height: 80px;
+  border-radius: 0 0 8px 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid rgba(0, 212, 255, 0.15);
+  cursor: pointer;
+}
+
 /* Presets Grid */
 .presets-grid {
   display: grid;
@@ -609,6 +700,12 @@ input[type="checkbox"]:checked::after {
 }
 
 /* Responsive */
+@media (max-width: 960px) {
+  :root {
+    --panel-width: 280px;
+  }
+}
+
 @media (max-width: 768px) {
   #app {
     flex-direction: column;
@@ -624,5 +721,17 @@ input[type="checkbox"]:checked::after {
 
   #canvas-area {
     height: 50vh;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

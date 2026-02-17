@@ -518,6 +518,8 @@ export function initUI(state, onStateChange, animator) {
         $('classic-controls').style.display = this.value === 'classic' ? 'block' : 'none';
         $('particle-controls').style.display = this.value === 'particles' ? 'block' : 'none';
         $('vapor-controls').style.display = this.value === 'vapor' ? 'block' : 'none';
+        // Show blend mode only for particles/vapor
+        $('blend-mode-group').style.display = (this.value === 'particles' || this.value === 'vapor') ? '' : 'none';
         resetParticles();
         onStateChange('renderMode');
     };
@@ -585,6 +587,7 @@ export function initUI(state, onStateChange, animator) {
     // ── Colors ──────────────────────────────────────────────────────────────────
     $('color-mode').onchange = function () {
         state.colorParams.mode = this.value;
+        // Show color pickers for dual, single, and vivid (vivid derives from colorA/colorB)
         $('color-pickers').style.display = this.value === 'spectral' ? 'none' : 'grid';
         resetParticles();
         onStateChange('color');
@@ -603,6 +606,12 @@ export function initUI(state, onStateChange, animator) {
     $('bg-color').oninput = function () {
         state.bgColor = this.value;
         onStateChange('bg');
+    };
+
+    // Blend mode (additive vs normal)
+    $('blend-mode').onchange = function () {
+        state.colorParams.blendMode = this.value;
+        onStateChange('color');
     };
 
     $('color-pickers').style.display = 'none';

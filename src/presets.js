@@ -84,4 +84,13 @@ export const COLOR_PALETTES = [
   { name: 'Monochrome', colorA: '#ffffff', colorB: '#888888', bg: '#000000' },
   { name: 'Aurora', colorA: '#00f5d4', colorB: '#9b5de5', bg: '#0a0a14' },
   { name: 'Infrared', colorA: '#ff006e', colorB: '#ffbe0b', bg: '#10000a' },
+  // Gallery-inspired palettes (Image Savant aesthetic)
+  { name: 'Electric Plasma', colorA: '#00e5ff', colorB: '#ff6d00', bg: '#020208' },
+  { name: 'Bioluminescence', colorA: '#00ff87', colorB: '#e040fb', bg: '#030308' },
+  { name: 'Stellar Forge', colorA: '#ffd600', colorB: '#aa00ff', bg: '#050208' },
+  { name: 'Deep Current', colorA: '#1de9b6', colorB: '#d50000', bg: '#020505' },
+  { name: 'Nebula Core', colorA: '#ff1744', colorB: '#00b0ff', bg: '#050205' },
+  { name: 'Solar Wind', colorA: '#ffab00', colorB: '#651fff', bg: '#050300' },
+  { name: 'Phantom Silk', colorA: '#e0e0e0', colorB: '#7c4dff', bg: '#010108' },
+  { name: 'Toxic Bloom', colorA: '#76ff03', colorB: '#ff3d00', bg: '#020500' },
 ];

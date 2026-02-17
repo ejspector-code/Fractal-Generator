@@ -7,6 +7,7 @@ let audioContext = null;
 let analyser = null;
 let mediaStream = null;
 let frequencyData = null;
+let timeDomainData = null;
 let active = false;
 
 const FFT_SIZE = 2048;
@@ -33,6 +34,7 @@ export async function startAudio() {
         // Do NOT connect analyser to destination — we don't want feedback
 
         frequencyData = new Uint8Array(analyser.frequencyBinCount);
+        timeDomainData = new Uint8Array(analyser.fftSize);
         active = true;
 
         return { ok: true };
@@ -68,6 +70,7 @@ function cleanup() {
     }
     analyser = null;
     frequencyData = null;
+    timeDomainData = null;
 }
 
 /**
@@ -99,4 +102,14 @@ export function getSampleRate() {
  */
 export function getBinCount() {
     return analyser ? analyser.frequencyBinCount : FFT_SIZE / 2;
+}
+
+/**
+ * Get current time-domain waveform data (Uint8Array, centered at 128).
+ * Call this once per frame. Returns null if not active.
+ */
+export function getTimeDomainData() {
+    if (!active || !analyser || !timeDomainData) return null;
+    analyser.getByteTimeDomainData(timeDomainData);
+    return timeDomainData;
 }

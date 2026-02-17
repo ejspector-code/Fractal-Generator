@@ -9,11 +9,13 @@ import { Animator } from './animator.js';
 import { DEJONG_PRESETS, CLIFFORD_PRESETS, LORENZ_PRESETS, AIZAWA_PRESETS, BUDDHABROT_PRESETS, BURNINGSHIP_PRESETS, CURLNOISE_PRESETS } from './presets.js';
 import { initUI } from './ui.js';
 import { savePNG, startRecording, stopRecording, isRecording } from './exporter.js';
-import { startAudio, stopAudio, getFrequencyData, isActive as isAudioActive, getSampleRate, getBinCount } from './audio.js';
+import { startAudio, stopAudio, getFrequencyData, getTimeDomainData, isActive as isAudioActive, getSampleRate, getBinCount } from './audio.js';
 import { analyzeFrame, resetAnalysis } from './audioReactive.js';
 import { perturbCoeffs } from './mouseInteraction.js';
 import { applyPostProcessing } from './postProcess.js';
 import { applySymmetry } from './symmetry.js';
+import { startMidi, stopMidi, isMidiActive, getMidiFrequencyData, getMidiTimeDomainData, getMidiSampleRate, getMidiBinCount, setMidiWaveform, getMidiActiveNotes, getMidiDevices, setNoteCallback, noteOn, noteOff } from './midi.js';
+import { drawWaveform } from './waveformOverlay.js';
 
 
 // ── Shared State ──────────────────────────────────────────────────────────────
@@ -65,9 +67,10 @@ const state = {
   },
 
   colorParams: {
-    mode: 'spectral', // 'single' | 'dual' | 'spectral'
+    mode: 'spectral', // 'single' | 'dual' | 'spectral' | 'vivid'
     colorA: '#00d4ff',
     colorB: '#ff006e',
+    blendMode: 'normal', // 'normal' | 'add'
   },
 
   bgColor: '#0a0a0f',
@@ -81,6 +84,15 @@ const state = {
 
   // Audio reactive
   audioSensitivity: 1.0,
+  audioFeatures: null, // { bass, mid, treble, energy, beat } or null
+  timeDomainData: null, // Uint8Array waveform for renderer displacement
+
+  // Waveform overlay
+  waveformOverlay: {
+    enabled: false,
+    intensity: 0.7,
+    style: 'oscilloscope', // 'oscilloscope' | 'mirrored' | 'circular' | 'bars' | 'radial'
+  },
 
   // Mouse interaction
   mouse: {
@@ -275,22 +287,46 @@ const sketch = (p) => {
       }
     }
 
-    // ── Audio Analysis ────────────────────────────────────────────────────
-    if (isAudioActive()) {
+    // ── Audio Analysis (Mic or MIDI, MIDI takes priority) ─────────────────
+    let currentTimeDomain = null;
+    if (isMidiActive()) {
+      const freqData = getMidiFrequencyData();
+      if (freqData) {
+        const features = analyzeFrame(freqData, getMidiSampleRate(), getMidiBinCount(), state.audioSensitivity);
+        animator.setAudioModulation(features);
+        state.audioFeatures = features;
+        drawAudioVisualizer(freqData);
+        drawMidiKeyboard();
+        currentTimeDomain = getMidiTimeDomainData();
+      }
+    } else if (isAudioActive()) {
       const freqData = getFrequencyData();
       if (freqData) {
         const features = analyzeFrame(freqData, getSampleRate(), getBinCount(), state.audioSensitivity);
         animator.setAudioModulation(features);
-        // Draw mini visualizer
+        state.audioFeatures = features;
         drawAudioVisualizer(freqData);
+        currentTimeDomain = getTimeDomainData();
       }
+    } else {
+      state.audioFeatures = null;
     }
+
+    // Store time-domain data on state for renderer access
+    state.timeDomainData = currentTimeDomain;
 
     // Animation update
     const animCoeffs = animator.update();
     if (animCoeffs) {
       applyAnimCoeffs(animCoeffs);
       syncCurrentSliders();
+      state.needsRedraw = true;
+    }
+    // Pass animator's color shift to renderers
+    state.audioColorShift = animator.colorShift || 0;
+
+    // Force redraw every frame when waveform overlay or audio effects are active
+    if ((state.waveformOverlay.enabled && currentTimeDomain) || state.audioFeatures) {
       state.needsRedraw = true;
     }
 
@@ -328,6 +364,11 @@ const sketch = (p) => {
       }
       didRender = true;
       state.needsRedraw = false;
+    }
+
+    // ── Waveform Overlay (after fractal render) ────────────────────────────
+    if (state.waveformOverlay.enabled && currentTimeDomain) {
+      drawWaveform(p, currentTimeDomain, state.audioFeatures, state.colorParams, state.waveformOverlay.intensity, state.waveformOverlay.style);
     }
 
     // Apply symmetry / kaleidoscope only on fresh renders
@@ -424,6 +465,110 @@ function drawAudioVisualizer(frequencyData) {
       barHeight
     );
   }
+}
+
+// ── MIDI Keyboard Visualizer ──────────────────────────────────────────────────
+
+let midiVizCanvas = null;
+let midiVizCtx = null;
+
+function drawMidiKeyboard() {
+  if (!midiVizCanvas) {
+    midiVizCanvas = document.getElementById('midi-keyboard-viz');
+    if (!midiVizCanvas) return;
+    midiVizCtx = midiVizCanvas.getContext('2d');
+  }
+
+  // Sync internal resolution to CSS size every frame (handles resize)
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = midiVizCanvas.offsetWidth;
+  const cssH = midiVizCanvas.offsetHeight;
+  if (midiVizCanvas.width !== Math.round(cssW * dpr) || midiVizCanvas.height !== Math.round(cssH * dpr)) {
+    midiVizCanvas.width = Math.round(cssW * dpr);
+    midiVizCanvas.height = Math.round(cssH * dpr);
+    midiVizCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  const w = cssW;
+  const h = cssH;
+  const ctx = midiVizCtx;
+  const activeNotes = getMidiActiveNotes();
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Draw 2 octaves (C3=48 to B4=71), 24 notes
+  const startNote = 36; // C2
+  const endNote = 84;   // C6
+  const totalNotes = endNote - startNote;
+
+  // Count white keys
+  const isBlack = [false, true, false, true, false, false, true, false, true, false, true, false];
+  let whiteCount = 0;
+  for (let n = startNote; n < endNote; n++) {
+    if (!isBlack[n % 12]) whiteCount++;
+  }
+
+  const whiteWidth = w / whiteCount;
+  const blackWidth = whiteWidth * 0.6;
+  const blackHeight = h * 0.6;
+
+  // Draw white keys first
+  let wx = 0;
+  for (let n = startNote; n < endNote; n++) {
+    if (isBlack[n % 12]) continue;
+    const isActive = activeNotes.has(n);
+
+    if (isActive) {
+      ctx.fillStyle = '#00d4ff';
+      ctx.shadowColor = '#00d4ff';
+      ctx.shadowBlur = 8;
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.fillRect(wx + 0.5, 0, whiteWidth - 1, h - 1);
+    ctx.shadowBlur = 0;
+
+    // Border
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(wx + 0.5, 0, whiteWidth - 1, h - 1);
+
+    wx += whiteWidth;
+  }
+
+  // Draw black keys on top
+  wx = 0;
+  for (let n = startNote; n < endNote; n++) {
+    if (isBlack[n % 12]) continue;
+
+    // Check if next note is black
+    if (n + 1 < endNote && isBlack[(n + 1) % 12]) {
+      const isActive = activeNotes.has(n + 1);
+
+      if (isActive) {
+        ctx.fillStyle = '#ff006e';
+        ctx.shadowColor = '#ff006e';
+        ctx.shadowBlur = 8;
+      } else {
+        ctx.fillStyle = 'rgba(30,30,40,0.95)';
+        ctx.shadowBlur = 0;
+      }
+
+      ctx.fillRect(wx + whiteWidth - blackWidth / 2, 0, blackWidth, blackHeight);
+      ctx.shadowBlur = 0;
+    }
+    wx += whiteWidth;
+  }
+}
+
+function clearMidiKeyboard() {
+  if (midiVizCanvas && midiVizCtx) {
+    midiVizCtx.clearRect(0, 0, midiVizCanvas.width, midiVizCanvas.height);
+  }
+  midiVizCanvas = null;
+  midiVizCtx = null;
 }
 
 // ── Initialize ────────────────────────────────────────────────────────────────
@@ -538,6 +683,212 @@ setTimeout(() => {
     const valEl = document.getElementById('val-sensitivity');
     if (valEl) valEl.textContent = state.audioSensitivity.toFixed(2);
   };
+
+  // Waveform overlay controls
+  document.getElementById('waveform-toggle').onchange = function () {
+    state.waveformOverlay.enabled = this.checked;
+    document.getElementById('waveform-intensity-group').style.display = this.checked ? '' : 'none';
+    document.getElementById('waveform-style-group').style.display = this.checked ? '' : 'none';
+  };
+  document.getElementById('waveform-intensity').oninput = function () {
+    state.waveformOverlay.intensity = parseFloat(this.value);
+    const valEl = document.getElementById('val-waveform-intensity');
+    if (valEl) valEl.textContent = state.waveformOverlay.intensity.toFixed(2);
+  };
+  document.getElementById('waveform-style').onchange = function () {
+    state.waveformOverlay.style = this.value;
+  };
+
+  // ── MIDI Controls ──────────────────────────────────────────────────────
+  const midiToggle = document.getElementById('midi-toggle');
+  const midiControls = document.getElementById('midi-controls');
+  const midiStatusDot = document.getElementById('midi-status-dot');
+  const midiStatusText = document.getElementById('midi-status-text');
+  const midiDeviceName = document.getElementById('midi-device-name');
+
+  midiToggle.onchange = async function () {
+    if (this.checked) {
+      midiStatusDot.className = 'midi-status-dot connecting';
+      midiStatusText.textContent = 'Connecting...';
+
+      const result = await startMidi();
+
+      if (result.ok) {
+        midiStatusDot.className = 'midi-status-dot active';
+        const devices = result.devices || getMidiDevices();
+        if (devices.length > 0) {
+          midiStatusText.textContent = 'Connected';
+          midiDeviceName.textContent = devices[0];
+        } else {
+          midiStatusText.textContent = 'Ready';
+          midiDeviceName.textContent = 'Use keyboard or click';
+        }
+        midiControls.style.display = '';
+        // Show the full-width keyboard below the canvas
+        document.getElementById('midi-keyboard-viz').style.display = 'block';
+
+        // If mic is active, stop it (MIDI takes priority)
+        if (isAudioActive()) {
+          stopAudio();
+          resetAnalysis();
+          statusDot.className = 'audio-status-dot';
+          statusText.textContent = 'Off';
+          btnStopListen.style.display = 'none';
+          btnListen.style.display = '';
+        }
+
+        // Set animator base
+        if (!animator.playing) {
+          const base = getAnimatorBase(state.attractorType);
+          animator.setBase(base);
+        }
+
+        setNoteCallback(() => { state.needsRedraw = true; });
+      } else {
+        midiStatusDot.className = 'midi-status-dot error';
+        midiStatusText.textContent = result.error || 'Error';
+        this.checked = false;
+      }
+    } else {
+      stopMidi();
+      resetAnalysis();
+      animator.setAudioModulation(null);
+      midiStatusDot.className = 'midi-status-dot';
+      midiStatusText.textContent = 'Off';
+      midiDeviceName.textContent = '—';
+      midiControls.style.display = 'none';
+      document.getElementById('midi-keyboard-viz').style.display = 'none';
+      clearMidiKeyboard();
+    }
+  };
+
+  document.getElementById('midi-waveform').onchange = function () {
+    setMidiWaveform(this.value);
+  };
+
+  // ── Computer Keyboard → MIDI Notes ────────────────────────────────────
+  // Two rows: bottom row = white keys (C3 to E5), top row = sharps
+  const KEY_MAP = {
+    // Bottom row — white keys
+    'z': 48, 'x': 50, 'c': 52, 'v': 53, 'b': 55, 'n': 57, 'm': 59,  // C3–B3
+    ',': 60, '.': 62, '/': 64,                                         // C4–E4
+    // Top row — next octave white keys
+    'q': 60, 'w': 62, 'e': 64, 'r': 65, 't': 67, 'y': 69, 'u': 71,  // C4–B4
+    'i': 72, 'o': 74, 'p': 76,                                        // C5–E5
+    // Middle row — sharps for bottom row
+    's': 49, 'd': 51, 'g': 54, 'h': 56, 'j': 58,                     // C#3–A#3
+    'l': 61, ';': 63,                                                  // C#4–D#4
+    // Number row — sharps for top row
+    '2': 61, '3': 63, '5': 66, '6': 68, '7': 70,                     // C#4–A#4
+    '9': 73, '0': 75,                                                  // C#5–D#5
+  };
+  const keysDown = new Set();
+
+  document.addEventListener('keydown', (e) => {
+    if (!isMidiActive()) return;
+    if (e.repeat) return;
+    // Don't capture if user is typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+    const note = KEY_MAP[e.key.toLowerCase()];
+    if (note !== undefined) {
+      e.preventDefault();
+      keysDown.add(e.key.toLowerCase());
+      noteOn(note, 100);
+    }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    if (!isMidiActive()) return;
+    const note = KEY_MAP[e.key.toLowerCase()];
+    if (note !== undefined) {
+      keysDown.delete(e.key.toLowerCase());
+      noteOff(note);
+    }
+  });
+
+  // ── Click-to-Play on Piano Visualizer ─────────────────────────────────
+  const pianoCanvas = document.getElementById('midi-keyboard-viz');
+  let pianoMouseDown = false;
+  let lastClickedNote = -1;
+
+  function getNoteFromClick(e) {
+    const rect = pianoCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const w = rect.width;
+    const h = rect.height;
+
+    const startNote = 36; // C2
+    const endNote = 84;   // C6
+    const isBlack = [false, true, false, true, false, false, true, false, true, false, true, false];
+
+    let whiteCount = 0;
+    for (let n = startNote; n < endNote; n++) {
+      if (!isBlack[n % 12]) whiteCount++;
+    }
+
+    const whiteWidth = w / whiteCount;
+    const blackWidth = whiteWidth * 0.6;
+    const blackHeight = h * 0.6;
+
+    // Check black keys first (they're on top)
+    if (y < blackHeight) {
+      let wx = 0;
+      for (let n = startNote; n < endNote; n++) {
+        if (isBlack[n % 12]) continue;
+        if (n + 1 < endNote && isBlack[(n + 1) % 12]) {
+          const bx = wx + whiteWidth - blackWidth / 2;
+          if (x >= bx && x < bx + blackWidth) {
+            return n + 1;
+          }
+        }
+        wx += whiteWidth;
+      }
+    }
+
+    // Check white keys
+    let wx = 0;
+    for (let n = startNote; n < endNote; n++) {
+      if (isBlack[n % 12]) continue;
+      if (x >= wx && x < wx + whiteWidth) {
+        return n;
+      }
+      wx += whiteWidth;
+    }
+    return -1;
+  }
+
+  pianoCanvas.addEventListener('mousedown', (e) => {
+    if (!isMidiActive()) return;
+    pianoMouseDown = true;
+    const note = getNoteFromClick(e);
+    if (note >= 0) {
+      lastClickedNote = note;
+      noteOn(note, 100);
+    }
+  });
+
+  pianoCanvas.addEventListener('mousemove', (e) => {
+    if (!pianoMouseDown || !isMidiActive()) return;
+    const note = getNoteFromClick(e);
+    if (note >= 0 && note !== lastClickedNote) {
+      if (lastClickedNote >= 0) noteOff(lastClickedNote);
+      lastClickedNote = note;
+      noteOn(note, 100);
+    }
+  });
+
+  pianoCanvas.addEventListener('mouseup', () => {
+    if (lastClickedNote >= 0) noteOff(lastClickedNote);
+    pianoMouseDown = false;
+    lastClickedNote = -1;
+  });
+
+  pianoCanvas.addEventListener('mouseleave', () => {
+    if (pianoMouseDown && lastClickedNote >= 0) noteOff(lastClickedNote);
+    pianoMouseDown = false;
+    lastClickedNote = -1;
+  });
 
   // ── Mouse Interaction Controls ──────────────────────────────────────────
   document.getElementById('mouse-toggle').onchange = function () {
