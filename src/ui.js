@@ -808,6 +808,9 @@ export function initUI(state, onStateChange, animator) {
     syncCurlNoiseSliders();
     updateSeedDisplay();
 
+    // Start auto-animate by default
+    $('auto-animate').onchange();
+
     return {
         syncCoeffSliders, syncCliffordSliders, syncLorenzSliders,
         syncAizawaSliders, syncBuddhabrotSliders, syncBurningShipSliders,
