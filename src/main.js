@@ -14,7 +14,7 @@ import { analyzeFrame, resetAnalysis } from './audioReactive.js';
 import { perturbCoeffs } from './mouseInteraction.js';
 import { applyPostProcessing } from './postProcess.js';
 import { applySymmetry } from './symmetry.js';
-import { startMidi, stopMidi, isMidiActive, getMidiFrequencyData, getMidiTimeDomainData, getMidiSampleRate, getMidiBinCount, setMidiWaveform, getMidiActiveNotes, getMidiDevices, setNoteCallback, noteOn, noteOff, setFilterCutoff, setFilterQ, setFilterType, setDistortionDrive, setWahEnabled, setWahRate, setWahDepth, setWahBaseFreq, setDelayTime, setDelayFeedback, setDelayMix, setReverbMix, setReverbDecay, setADSR, setMasterVolume, setOctaveShift, startLooperRecording, stopLooperRecording, toggleLooperPlayback, stopLooper, getLooperState, setLooperCallback } from './midi.js';
+import { startMidi, stopMidi, isMidiActive, getMidiFrequencyData, getMidiTimeDomainData, getMidiSampleRate, getMidiBinCount, setMidiWaveform, getMidiActiveNotes, getMidiDevices, setNoteCallback, noteOn, noteOff, setFilterCutoff, setFilterQ, setFilterType, setDistortionDrive, setWahEnabled, setWahRate, setWahDepth, setWahBaseFreq, setDelayTime, setDelayFeedback, setDelayMix, setReverbMix, setReverbDecay, setADSR, setMasterVolume, setOctaveShift, startLooperRecording, stopLooperRecording, toggleLooperPlayback, stopLooper, getLooperState, setLooperCallback, startDrumSequencer, stopDrumSequencer, toggleDrumStep, setDrumBPM, setDrumVolume, clearDrumPattern, isDrumPlaying, setDrumStepCallback } from './midi.js';
 import { drawWaveform } from './waveformOverlay.js';
 import { playClickPerc } from './clickSound.js';
 
@@ -772,6 +772,10 @@ setTimeout(() => {
       const drawerToggle = document.getElementById('midi-drawer-toggle');
       drawerContent.classList.remove('open');
       drawerToggle.classList.remove('open');
+      // Stop drum machine
+      stopDrumSequencer();
+      clearDrumPattern();
+      document.querySelectorAll('.drum-step').forEach(c => { c.classList.remove('active'); c.classList.remove('current'); });
       clearMidiKeyboard();
     }
   };
@@ -948,6 +952,81 @@ setTimeout(() => {
   looperStop.onclick = () => {
     stopLooper();
   };
+
+  // ── Drum Machine ────────────────────────────────────────────────────────
+  const drumPlayBtn = document.getElementById('drum-play');
+  const drumStopBtn = document.getElementById('drum-stop');
+  const drumClearBtn = document.getElementById('drum-clear');
+  const drumBpmSlider = document.getElementById('drum-bpm');
+  const drumBpmVal = document.getElementById('drum-bpm-val');
+  const drumVolSlider = document.getElementById('drum-volume');
+  const drumVolVal = document.getElementById('drum-vol-val');
+
+  // Build step grid cells
+  const drumRows = document.querySelectorAll('#drum-grid .drum-row');
+  drumRows.forEach((row) => {
+    const track = parseInt(row.dataset.track);
+    const stepsContainer = row.querySelector('.drum-steps');
+    for (let s = 0; s < 16; s++) {
+      const cell = document.createElement('div');
+      cell.className = 'drum-step';
+      cell.dataset.step = s;
+      cell.onclick = () => {
+        const isActive = toggleDrumStep(track, s);
+        cell.classList.toggle('active', isActive);
+      };
+      stepsContainer.appendChild(cell);
+    }
+  });
+
+  drumBpmSlider.oninput = function () {
+    const v = parseInt(this.value);
+    setDrumBPM(v);
+    drumBpmVal.textContent = v;
+  };
+
+  drumVolSlider.oninput = function () {
+    const v = parseFloat(this.value);
+    setDrumVolume(v);
+    drumVolVal.textContent = v.toFixed(2);
+  };
+
+  drumPlayBtn.onclick = () => {
+    if (isDrumPlaying()) {
+      stopDrumSequencer();
+      drumPlayBtn.textContent = '▶';
+      drumStopBtn.disabled = true;
+    } else {
+      startDrumSequencer();
+      drumPlayBtn.textContent = '⏸';
+      drumStopBtn.disabled = false;
+    }
+  };
+
+  drumStopBtn.onclick = () => {
+    stopDrumSequencer();
+    drumPlayBtn.textContent = '▶';
+    drumStopBtn.disabled = true;
+  };
+
+  drumClearBtn.onclick = () => {
+    clearDrumPattern();
+    // Clear all active classes
+    document.querySelectorAll('.drum-step.active').forEach(c => c.classList.remove('active'));
+  };
+
+  // Step highlight callback
+  setDrumStepCallback((step) => {
+    // Remove previous highlights
+    document.querySelectorAll('.drum-step.current').forEach(c => c.classList.remove('current'));
+    if (step >= 0) {
+      // Highlight current column
+      drumRows.forEach((row) => {
+        const cells = row.querySelectorAll('.drum-step');
+        if (cells[step]) cells[step].classList.add('current');
+      });
+    }
+  });
 
   // ── Computer Keyboard → MIDI Notes ────────────────────────────────────
   // Two rows: bottom row = white keys (C3 to E5), top row = sharps

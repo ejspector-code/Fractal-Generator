@@ -937,6 +937,141 @@ input[type="checkbox"]:checked::after {
   letter-spacing: 0.5px;
 }
 
+/* Drum Machine */
+.midi-fx-drums {
+  min-width: 420px;
+}
+
+.drum-controls-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  justify-content: center;
+}
+
+.drum-play-btn {
+  color: #4ade80;
+}
+
+.drum-stop-btn {
+  color: #f87171;
+}
+
+.drum-clear-btn {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.drum-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+}
+
+.drum-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.drum-label {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+  letter-spacing: 0.3px;
+}
+
+.drum-steps {
+  display: flex;
+  gap: 2px;
+}
+
+.drum-step {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  background: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.drum-step:hover {
+  border-color: rgba(0, 212, 255, 0.4);
+  background: rgba(0, 212, 255, 0.08);
+}
+
+.drum-step.active {
+  background: rgba(0, 212, 255, 0.45);
+  border-color: rgba(0, 212, 255, 0.7);
+  box-shadow: 0 0 6px rgba(0, 212, 255, 0.3);
+}
+
+/* Beat grouping: slight gap every 4 steps */
+.drum-step:nth-child(4n+1):not(:first-child) {
+  margin-left: 4px;
+}
+
+.drum-step.current {
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.drum-step.active.current {
+  background: rgba(0, 212, 255, 0.8);
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.6);
+}
+
+/* Track-specific colors for active steps */
+.drum-row[data-track="0"] .drum-step.active {
+  background: rgba(251, 146, 60, 0.55);
+  border-color: rgba(251, 146, 60, 0.7);
+  box-shadow: 0 0 6px rgba(251, 146, 60, 0.3);
+}
+
+.drum-row[data-track="0"] .drum-step.active.current {
+  background: rgba(251, 146, 60, 0.9);
+  box-shadow: 0 0 12px rgba(251, 146, 60, 0.6);
+}
+
+.drum-row[data-track="1"] .drum-step.active {
+  background: rgba(250, 204, 21, 0.5);
+  border-color: rgba(250, 204, 21, 0.7);
+  box-shadow: 0 0 6px rgba(250, 204, 21, 0.3);
+}
+
+.drum-row[data-track="1"] .drum-step.active.current {
+  background: rgba(250, 204, 21, 0.85);
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.6);
+}
+
+.drum-row[data-track="2"] .drum-step.active {
+  background: rgba(74, 222, 128, 0.45);
+  border-color: rgba(74, 222, 128, 0.7);
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.3);
+}
+
+.drum-row[data-track="2"] .drum-step.active.current {
+  background: rgba(74, 222, 128, 0.85);
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
+}
+
+.drum-row[data-track="3"] .drum-step.active {
+  background: rgba(192, 132, 252, 0.45);
+  border-color: rgba(192, 132, 252, 0.7);
+  box-shadow: 0 0 6px rgba(192, 132, 252, 0.3);
+}
+
+.drum-row[data-track="3"] .drum-step.active.current {
+  background: rgba(192, 132, 252, 0.85);
+  box-shadow: 0 0 12px rgba(192, 132, 252, 0.6);
+}
+
 /* Responsive */
 @media (max-width: 960px) {
   :root {

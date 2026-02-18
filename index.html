@@ -183,6 +183,44 @@
                 <div class="midi-looper-status" id="fx-looper-status">Idle</div>
               </div>
 
+              <div class="midi-fx-divider"></div>
+
+              <!-- Drum Machine -->
+              <div class="midi-fx-group midi-fx-drums">
+                <div class="midi-fx-title">Drums</div>
+                <div class="drum-controls-row">
+                  <button id="drum-play" class="midi-looper-btn drum-play-btn" title="Play">▶</button>
+                  <button id="drum-stop" class="midi-looper-btn drum-stop-btn" title="Stop" disabled>⏹</button>
+                  <button id="drum-clear" class="midi-looper-btn drum-clear-btn" title="Clear">✕</button>
+                </div>
+                <div class="midi-fx-control">
+                  <label for="drum-bpm">BPM <span class="fx-val" id="drum-bpm-val">120</span></label>
+                  <input type="range" id="drum-bpm" min="40" max="240" step="1" value="120" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="drum-volume">Vol <span class="fx-val" id="drum-vol-val">0.70</span></label>
+                  <input type="range" id="drum-volume" min="0" max="1" step="0.01" value="0.7" />
+                </div>
+                <div class="drum-grid" id="drum-grid">
+                  <div class="drum-row" data-track="0">
+                    <span class="drum-label">Kick</span>
+                    <div class="drum-steps"></div>
+                  </div>
+                  <div class="drum-row" data-track="1">
+                    <span class="drum-label">Snare</span>
+                    <div class="drum-steps"></div>
+                  </div>
+                  <div class="drum-row" data-track="2">
+                    <span class="drum-label">HiHat</span>
+                    <div class="drum-steps"></div>
+                  </div>
+                  <div class="drum-row" data-track="3">
+                    <span class="drum-label">Clap</span>
+                    <div class="drum-steps"></div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
