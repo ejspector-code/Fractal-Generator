@@ -76,7 +76,7 @@ const state = {
 
   bgColor: '#0a0a0f',
 
-  aspectRatio: '1:1', // '1:1' | '16:9' | '9:16'
+  aspectRatio: '16:9', // '1:1' | '16:9' | '9:16'
 
   diffusion: {
     enabled: false,
