@@ -769,7 +769,8 @@ input[type="checkbox"]:checked::after {
 }
 
 .midi-drawer-content.open {
-  max-height: 260px;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .midi-fx-row {
