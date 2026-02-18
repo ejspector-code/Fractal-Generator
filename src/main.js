@@ -776,6 +776,18 @@ setTimeout(() => {
     }
   };
 
+  // Auto-start MIDI with effects drawer open
+  setTimeout(() => {
+    midiToggle.checked = true;
+    midiToggle.onchange.call(midiToggle).then(() => {
+      // Open the effects drawer
+      const dc = document.getElementById('midi-drawer-content');
+      const dt = document.getElementById('midi-drawer-toggle');
+      dc.classList.add('open');
+      dt.classList.add('open');
+    });
+  }, 500);
+
   document.getElementById('midi-waveform').onchange = function () {
     setMidiWaveform(this.value);
   };
