@@ -14,7 +14,7 @@ import { analyzeFrame, resetAnalysis } from './audioReactive.js';
 import { perturbCoeffs } from './mouseInteraction.js';
 import { applyPostProcessing } from './postProcess.js';
 import { applySymmetry } from './symmetry.js';
-import { startMidi, stopMidi, isMidiActive, getMidiFrequencyData, getMidiTimeDomainData, getMidiSampleRate, getMidiBinCount, setMidiWaveform, getMidiActiveNotes, getMidiDevices, setNoteCallback, noteOn, noteOff } from './midi.js';
+import { startMidi, stopMidi, isMidiActive, getMidiFrequencyData, getMidiTimeDomainData, getMidiSampleRate, getMidiBinCount, setMidiWaveform, getMidiActiveNotes, getMidiDevices, setNoteCallback, noteOn, noteOff, setFilterCutoff, setFilterQ, setFilterType, setDistortionDrive, setWahEnabled, setWahRate, setWahDepth, setWahBaseFreq, setDelayTime, setDelayFeedback, setDelayMix, setReverbMix, setReverbDecay, setADSR, setMasterVolume, setOctaveShift, startLooperRecording, stopLooperRecording, toggleLooperPlayback, stopLooper, getLooperState, setLooperCallback } from './midi.js';
 import { drawWaveform } from './waveformOverlay.js';
 import { playClickPerc } from './clickSound.js';
 
@@ -731,8 +731,9 @@ setTimeout(() => {
           midiDeviceName.textContent = 'Use keyboard or click';
         }
         midiControls.style.display = '';
-        // Show the full-width keyboard below the canvas
+        // Show the full-width keyboard and effects drawer below the canvas
         document.getElementById('midi-keyboard-viz').style.display = 'block';
+        document.getElementById('midi-effects-drawer').style.display = '';
 
         // If mic is active, stop it (MIDI takes priority)
         if (isAudioActive()) {
@@ -765,12 +766,175 @@ setTimeout(() => {
       midiDeviceName.textContent = '—';
       midiControls.style.display = 'none';
       document.getElementById('midi-keyboard-viz').style.display = 'none';
+      document.getElementById('midi-effects-drawer').style.display = 'none';
+      // Reset drawer state
+      const drawerContent = document.getElementById('midi-drawer-content');
+      const drawerToggle = document.getElementById('midi-drawer-toggle');
+      drawerContent.classList.remove('open');
+      drawerToggle.classList.remove('open');
       clearMidiKeyboard();
     }
   };
 
   document.getElementById('midi-waveform').onchange = function () {
     setMidiWaveform(this.value);
+  };
+
+  // ── MIDI Effects Drawer ────────────────────────────────────────────────
+  const drawerToggleBtn = document.getElementById('midi-drawer-toggle');
+  const drawerContent = document.getElementById('midi-drawer-content');
+
+  drawerToggleBtn.onclick = () => {
+    const isOpen = drawerContent.classList.toggle('open');
+    drawerToggleBtn.classList.toggle('open', isOpen);
+  };
+
+  // Synth controls
+  document.getElementById('fx-waveform').onchange = function () {
+    setMidiWaveform(this.value);
+    // Sync sidebar selector too
+    const sidebar = document.getElementById('midi-waveform');
+    if (sidebar) sidebar.value = this.value;
+  };
+
+  document.getElementById('fx-octave').oninput = function () {
+    setOctaveShift(parseInt(this.value));
+    document.getElementById('fx-val-octave').textContent = this.value;
+  };
+
+  document.getElementById('fx-volume').oninput = function () {
+    setMasterVolume(parseFloat(this.value));
+    document.getElementById('fx-val-volume').textContent = parseFloat(this.value).toFixed(2);
+  };
+
+  // ADSR
+  document.getElementById('fx-attack').oninput = function () {
+    document.getElementById('fx-val-attack').textContent = parseFloat(this.value).toFixed(2);
+    syncADSR();
+  };
+  document.getElementById('fx-decay').oninput = function () {
+    document.getElementById('fx-val-decay').textContent = parseFloat(this.value).toFixed(2);
+    syncADSR();
+  };
+  document.getElementById('fx-sustain').oninput = function () {
+    document.getElementById('fx-val-sustain').textContent = parseFloat(this.value).toFixed(2);
+    syncADSR();
+  };
+  document.getElementById('fx-release').oninput = function () {
+    document.getElementById('fx-val-release').textContent = parseFloat(this.value).toFixed(2);
+    syncADSR();
+  };
+  function syncADSR() {
+    setADSR(
+      parseFloat(document.getElementById('fx-attack').value),
+      parseFloat(document.getElementById('fx-decay').value),
+      parseFloat(document.getElementById('fx-sustain').value),
+      parseFloat(document.getElementById('fx-release').value)
+    );
+  }
+
+  // Filter
+  document.getElementById('fx-filter-type').onchange = function () {
+    setFilterType(this.value);
+  };
+  document.getElementById('fx-filter-cutoff').oninput = function () {
+    const v = parseInt(this.value);
+    setFilterCutoff(v);
+    document.getElementById('fx-val-cutoff').textContent = v;
+  };
+  document.getElementById('fx-filter-q').oninput = function () {
+    const v = parseFloat(this.value);
+    setFilterQ(v);
+    document.getElementById('fx-val-q').textContent = v.toFixed(1);
+  };
+
+  // Distortion
+  document.getElementById('fx-distortion').oninput = function () {
+    const v = parseFloat(this.value);
+    setDistortionDrive(v);
+    document.getElementById('fx-val-drive').textContent = v.toFixed(1);
+  };
+
+  // Wah-Wah
+  document.getElementById('fx-wah-toggle').onchange = function () {
+    setWahEnabled(this.checked);
+  };
+  document.getElementById('fx-wah-rate').oninput = function () {
+    const v = parseFloat(this.value);
+    setWahRate(v);
+    document.getElementById('fx-val-wah-rate').textContent = v.toFixed(1);
+  };
+  document.getElementById('fx-wah-depth').oninput = function () {
+    const v = parseInt(this.value);
+    setWahDepth(v);
+    document.getElementById('fx-val-wah-depth').textContent = v;
+  };
+  document.getElementById('fx-wah-base').oninput = function () {
+    const v = parseInt(this.value);
+    setWahBaseFreq(v);
+    document.getElementById('fx-val-wah-base').textContent = v;
+  };
+
+  // Delay
+  document.getElementById('fx-delay-time').oninput = function () {
+    const v = parseFloat(this.value);
+    setDelayTime(v);
+    document.getElementById('fx-val-delay-time').textContent = v.toFixed(2);
+  };
+  document.getElementById('fx-delay-feedback').oninput = function () {
+    const v = parseFloat(this.value);
+    setDelayFeedback(v);
+    document.getElementById('fx-val-delay-fb').textContent = v.toFixed(2);
+  };
+  document.getElementById('fx-delay-mix').oninput = function () {
+    const v = parseFloat(this.value);
+    setDelayMix(v);
+    document.getElementById('fx-val-delay-mix').textContent = v.toFixed(2);
+  };
+
+  // Reverb
+  document.getElementById('fx-reverb-mix').oninput = function () {
+    const v = parseFloat(this.value);
+    setReverbMix(v);
+    document.getElementById('fx-val-reverb-mix').textContent = v.toFixed(2);
+  };
+  document.getElementById('fx-reverb-decay').oninput = function () {
+    const v = parseFloat(this.value);
+    setReverbDecay(v);
+    document.getElementById('fx-val-reverb-decay').textContent = v.toFixed(2);
+  };
+
+  // Looper
+  const looperRec = document.getElementById('fx-looper-rec');
+  const looperPlay = document.getElementById('fx-looper-play');
+  const looperStop = document.getElementById('fx-looper-stop');
+  const looperStatus = document.getElementById('fx-looper-status');
+
+  setLooperCallback((loopState) => {
+    looperStatus.textContent = loopState;
+    looperRec.classList.toggle('recording', loopState === 'recording');
+    looperPlay.classList.toggle('playing', loopState === 'playing');
+    looperPlay.disabled = (loopState === 'idle' || loopState === 'recording');
+    looperStop.disabled = (loopState === 'idle');
+    looperPlay.textContent = loopState === 'playing' ? '⏸' : '▶';
+  });
+
+  looperRec.onclick = () => {
+    const ls = getLooperState();
+    if (ls === 'recording') {
+      stopLooperRecording();
+    } else {
+      if (ls === 'playing') stopLooper();
+      startLooperRecording();
+    }
+  };
+
+  looperPlay.onclick = () => {
+    toggleLooperPlayback();
+  };
+
+  looperStop.onclick = () => {
+    stopLooper();
   };
 
   // ── Computer Keyboard → MIDI Notes ────────────────────────────────────

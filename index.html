@@ -22,6 +22,170 @@
       <div id="canvas-stage">
         <div id="canvas-container"></div>
         <canvas id="midi-keyboard-viz" style="display:none;"></canvas>
+
+        <!-- MIDI Effects Drawer -->
+        <div id="midi-effects-drawer" style="display:none;">
+          <button id="midi-drawer-toggle" class="midi-drawer-handle" aria-label="Toggle effects drawer">
+            <span class="midi-drawer-handle-bar"></span>
+            <span class="midi-drawer-label">Effects</span>
+            <span class="midi-drawer-chevron">▼</span>
+          </button>
+          <div id="midi-drawer-content" class="midi-drawer-content">
+            <div class="midi-fx-row">
+
+              <!-- Waveform & Octave -->
+              <div class="midi-fx-group">
+                <div class="midi-fx-title">Synth</div>
+                <div class="midi-fx-control">
+                  <label for="fx-waveform">Wave</label>
+                  <select id="fx-waveform">
+                    <option value="sawtooth">Saw</option>
+                    <option value="square">Square</option>
+                    <option value="sine">Sine</option>
+                    <option value="triangle">Tri</option>
+                  </select>
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-octave">Octave <span class="fx-val" id="fx-val-octave">0</span></label>
+                  <input type="range" id="fx-octave" min="-2" max="2" step="1" value="0" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-volume">Volume <span class="fx-val" id="fx-val-volume">0.50</span></label>
+                  <input type="range" id="fx-volume" min="0" max="1" step="0.01" value="0.5" />
+                </div>
+              </div>
+
+              <div class="midi-fx-divider"></div>
+
+              <!-- ADSR -->
+              <div class="midi-fx-group">
+                <div class="midi-fx-title">ADSR</div>
+                <div class="midi-fx-control">
+                  <label for="fx-attack">Atk <span class="fx-val" id="fx-val-attack">0.05</span></label>
+                  <input type="range" id="fx-attack" min="0.001" max="1.0" step="0.005" value="0.05" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-decay">Dec <span class="fx-val" id="fx-val-decay">0.15</span></label>
+                  <input type="range" id="fx-decay" min="0.01" max="1.5" step="0.01" value="0.15" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-sustain">Sus <span class="fx-val" id="fx-val-sustain">0.60</span></label>
+                  <input type="range" id="fx-sustain" min="0" max="1" step="0.01" value="0.6" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-release">Rel <span class="fx-val" id="fx-val-release">0.30</span></label>
+                  <input type="range" id="fx-release" min="0.01" max="3.0" step="0.01" value="0.3" />
+                </div>
+              </div>
+
+              <div class="midi-fx-divider"></div>
+
+              <!-- Filter -->
+              <div class="midi-fx-group">
+                <div class="midi-fx-title">Filter</div>
+                <div class="midi-fx-control">
+                  <label for="fx-filter-type">Type</label>
+                  <select id="fx-filter-type">
+                    <option value="lowpass" selected>LP</option>
+                    <option value="highpass">HP</option>
+                    <option value="bandpass">BP</option>
+                  </select>
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-filter-cutoff">Cutoff <span class="fx-val" id="fx-val-cutoff">8000</span></label>
+                  <input type="range" id="fx-filter-cutoff" min="50" max="16000" step="10" value="8000" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-filter-q">Reso <span class="fx-val" id="fx-val-q">1.0</span></label>
+                  <input type="range" id="fx-filter-q" min="0.1" max="20" step="0.1" value="1" />
+                </div>
+              </div>
+
+              <div class="midi-fx-divider"></div>
+
+              <!-- Distortion -->
+              <div class="midi-fx-group">
+                <div class="midi-fx-title">Distortion</div>
+                <div class="midi-fx-control">
+                  <label for="fx-distortion">Drive <span class="fx-val" id="fx-val-drive">0.0</span></label>
+                  <input type="range" id="fx-distortion" min="0" max="1" step="0.01" value="0" />
+                </div>
+              </div>
+
+              <div class="midi-fx-divider"></div>
+
+              <!-- Wah-Wah -->
+              <div class="midi-fx-group">
+                <div class="midi-fx-title">Wah-Wah</div>
+                <div class="midi-fx-control midi-fx-toggle-row">
+                  <label for="fx-wah-toggle">Enable</label>
+                  <input type="checkbox" id="fx-wah-toggle" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-wah-rate">Rate <span class="fx-val" id="fx-val-wah-rate">2.0</span></label>
+                  <input type="range" id="fx-wah-rate" min="0.1" max="12" step="0.1" value="2" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-wah-depth">Depth <span class="fx-val" id="fx-val-wah-depth">4000</span></label>
+                  <input type="range" id="fx-wah-depth" min="100" max="8000" step="50" value="4000" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-wah-base">Base <span class="fx-val" id="fx-val-wah-base">500</span></label>
+                  <input type="range" id="fx-wah-base" min="100" max="3000" step="20" value="500" />
+                </div>
+              </div>
+
+              <div class="midi-fx-divider"></div>
+
+              <!-- Delay -->
+              <div class="midi-fx-group">
+                <div class="midi-fx-title">Delay</div>
+                <div class="midi-fx-control">
+                  <label for="fx-delay-time">Time <span class="fx-val" id="fx-val-delay-time">0.30</span></label>
+                  <input type="range" id="fx-delay-time" min="0.01" max="1.5" step="0.01" value="0.3" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-delay-feedback">Feed <span class="fx-val" id="fx-val-delay-fb">0.30</span></label>
+                  <input type="range" id="fx-delay-feedback" min="0" max="0.9" step="0.01" value="0.3" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-delay-mix">Mix <span class="fx-val" id="fx-val-delay-mix">0.00</span></label>
+                  <input type="range" id="fx-delay-mix" min="0" max="1" step="0.01" value="0" />
+                </div>
+              </div>
+
+              <div class="midi-fx-divider"></div>
+
+              <!-- Reverb -->
+              <div class="midi-fx-group">
+                <div class="midi-fx-title">Reverb</div>
+                <div class="midi-fx-control">
+                  <label for="fx-reverb-mix">Mix <span class="fx-val" id="fx-val-reverb-mix">0.00</span></label>
+                  <input type="range" id="fx-reverb-mix" min="0" max="1" step="0.01" value="0" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-reverb-decay">Decay <span class="fx-val" id="fx-val-reverb-decay">1.50</span></label>
+                  <input type="range" id="fx-reverb-decay" min="0.3" max="5" step="0.1" value="1.5" />
+                </div>
+              </div>
+
+              <div class="midi-fx-divider"></div>
+
+              <!-- Looper -->
+              <div class="midi-fx-group midi-fx-looper">
+                <div class="midi-fx-title">Looper</div>
+                <div class="midi-looper-controls">
+                  <button id="fx-looper-rec" class="midi-looper-btn midi-looper-rec" title="Record">⏺</button>
+                  <button id="fx-looper-play" class="midi-looper-btn midi-looper-play" title="Play/Pause"
+                    disabled>▶</button>
+                  <button id="fx-looper-stop" class="midi-looper-btn midi-looper-stop" title="Clear" disabled>⏹</button>
+                </div>
+                <div class="midi-looper-status" id="fx-looper-status">Idle</div>
+              </div>
+
+            </div>
+          </div>
+        </div>
       </div>
       <div id="fps-counter">0 FPS</div>
     </main>
