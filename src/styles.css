@@ -85,6 +85,8 @@ body {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
 }
 
 #canvas-container canvas {
@@ -584,11 +586,13 @@ input[type="checkbox"]:checked::after {
 
 #midi-keyboard-viz {
   width: 100%;
+  max-width: 100%;
   height: 80px;
   border-radius: 0 0 8px 8px;
   background: rgba(0, 0, 0, 0.4);
   border-top: 1px solid rgba(0, 212, 255, 0.15);
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 /* Presets Grid */
