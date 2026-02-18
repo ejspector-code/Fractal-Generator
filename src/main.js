@@ -17,6 +17,7 @@ import { applySymmetry } from './symmetry.js';
 import { startMidi, stopMidi, isMidiActive, getMidiFrequencyData, getMidiTimeDomainData, getMidiSampleRate, getMidiBinCount, setMidiWaveform, getMidiActiveNotes, getMidiDevices, setNoteCallback, noteOn, noteOff, setFilterCutoff, setFilterQ, setFilterType, setDistortionDrive, setWahEnabled, setWahRate, setWahDepth, setWahBaseFreq, setDelayTime, setDelayFeedback, setDelayMix, setReverbMix, setReverbDecay, setADSR, setMasterVolume, setOctaveShift, startLooperRecording, stopLooperRecording, toggleLooperPlayback, stopLooper, getLooperState, setLooperCallback, startDrumSequencer, stopDrumSequencer, toggleDrumStep, setDrumBPM, setDrumVolume, clearDrumPattern, isDrumPlaying, setDrumStepCallback } from './midi.js';
 import { drawWaveform } from './waveformOverlay.js';
 import { playClickPerc } from './clickSound.js';
+import { initShaderFX, renderShaderFX, setShaderPreset, setShaderIntensity, destroyShaderFX } from './shaderFX.js';
 
 
 // ── Shared State ──────────────────────────────────────────────────────────────
@@ -257,6 +258,9 @@ const sketch = (p) => {
     // Background fill
     const bg = hexToRgbSimple(state.bgColor);
     p.background(bg.r, bg.g, bg.b);
+
+    // Init shader FX overlay
+    initShaderFX(p.drawingContext.canvas);
   };
 
   p.draw = () => {
@@ -383,6 +387,9 @@ const sketch = (p) => {
     // Post-processing overlay (runs every frame for grain animation)
     const p5Canvas = p.drawingContext.canvas;
     applyPostProcessing(p5Canvas, state.postProcess);
+
+    // Shader FX overlay
+    renderShaderFX(p5Canvas, state.audioFeatures);
   };
 
   // Click burst handler
@@ -1027,6 +1034,17 @@ setTimeout(() => {
       });
     }
   });
+
+  // ── Visual FX Shader Controls ────────────────────────────────────────
+  document.getElementById('shader-preset').onchange = function () {
+    setShaderPreset(this.value);
+  };
+
+  document.getElementById('shader-intensity').oninput = function () {
+    const v = parseFloat(this.value);
+    setShaderIntensity(v);
+    document.getElementById('shader-intensity-val').textContent = v.toFixed(2);
+  };
 
   // ── Computer Keyboard → MIDI Notes ────────────────────────────────────
   // Two rows: bottom row = white keys (C3 to E5), top row = sharps

@@ -221,6 +221,31 @@
                 </div>
               </div>
 
+              <div class="midi-fx-divider"></div>
+
+              <!-- Visual FX Shaders -->
+              <div class="midi-fx-group midi-fx-visualfx">
+                <div class="midi-fx-title">Visual FX</div>
+                <div class="midi-fx-control">
+                  <label for="shader-preset">Preset</label>
+                  <select id="shader-preset">
+                    <option value="off" selected>Off</option>
+                    <option value="kaleidoscope">Kaleidoscope</option>
+                    <option value="liquid">Liquid Warp</option>
+                    <option value="rgbShift">RGB Shift</option>
+                    <option value="tunnel">Tunnel Zoom</option>
+                    <option value="pixelMosaic">Pixel Mosaic</option>
+                    <option value="edgeGlow">Edge Glow</option>
+                    <option value="colorCycle">Color Cycle</option>
+                    <option value="glitch">Glitch</option>
+                  </select>
+                </div>
+                <div class="midi-fx-control">
+                  <label for="shader-intensity">Mix <span class="fx-val" id="shader-intensity-val">0.50</span></label>
+                  <input type="range" id="shader-intensity" min="0" max="1" step="0.01" value="0.5" />
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
