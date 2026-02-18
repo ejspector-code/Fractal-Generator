@@ -62,6 +62,154 @@ let effectParams = {
     octaveShift: 0,
 };
 
+// ── Scale Lock ─────────────────────────────────────────────────────────────────
+const SCALE_INTERVALS = {
+    chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    major: [0, 2, 4, 5, 7, 9, 11],
+    minor: [0, 2, 3, 5, 7, 8, 10],
+    pentatonic: [0, 2, 4, 7, 9],
+    blues: [0, 3, 5, 6, 7, 10],
+    dorian: [0, 2, 3, 5, 7, 9, 10],
+    mixolydian: [0, 2, 4, 5, 7, 9, 10],
+};
+let scaleLock = { enabled: false, root: 0, scale: 'major' };
+
+function quantizeNote(note) {
+    if (!scaleLock.enabled || scaleLock.scale === 'chromatic') return note;
+    const intervals = SCALE_INTERVALS[scaleLock.scale] || SCALE_INTERVALS.major;
+    const pc = ((note - scaleLock.root) % 12 + 12) % 12; // pitch class relative to root
+    // Find nearest scale degree
+    let bestDist = 99, bestPC = 0;
+    for (const iv of intervals) {
+        const d = Math.min(Math.abs(pc - iv), 12 - Math.abs(pc - iv));
+        if (d < bestDist) { bestDist = d; bestPC = iv; }
+    }
+    // Reconstruct note
+    const octave = Math.floor((note - scaleLock.root) / 12);
+    let result = scaleLock.root + octave * 12 + bestPC;
+    // Clamp to valid MIDI range
+    if (result < 0) result += 12;
+    if (result > 127) result -= 12;
+    return result;
+}
+
+// ── Chord Mode ────────────────────────────────────────────────────────────────
+const CHORD_INTERVALS = {
+    major: [0, 4, 7],
+    minor: [0, 3, 7],
+    '7th': [0, 4, 7, 10],
+    min7: [0, 3, 7, 10],
+    sus4: [0, 5, 7],
+    power: [0, 7, 12],
+    dim: [0, 3, 6],
+};
+let chordMode = { enabled: false, type: 'major' };
+let chordVoiceMap = new Map(); // originalNote → [expandedNotes]
+
+function expandChord(note) {
+    if (!chordMode.enabled) return [note];
+    const intervals = CHORD_INTERVALS[chordMode.type] || CHORD_INTERVALS.major;
+    return intervals.map(iv => note + iv).filter(n => n <= 127);
+}
+
+// ── Arpeggiator ───────────────────────────────────────────────────────────────
+let arp = { enabled: false, pattern: 'up', rate: '1/8', bpm: 120, octaves: 1 };
+let arpHeldNotes = [];      // notes currently held (after scale + chord)
+let arpTimer = null;
+let arpIndex = 0;
+let arpDirection = 1;       // 1 = ascending, -1 = descending
+let arpCurrentNote = -1;    // currently sounding arp note
+let arpOriginalHeld = new Map(); // originalNote → [chord-expanded notes]
+
+function getArpSequence() {
+    if (arpHeldNotes.length === 0) return [];
+    const sorted = [...new Set(arpHeldNotes)].sort((a, b) => a - b);
+    // Expand across octaves
+    const seq = [];
+    for (let oct = 0; oct < arp.octaves; oct++) {
+        for (const n of sorted) {
+            const shifted = n + oct * 12;
+            if (shifted <= 127) seq.push(shifted);
+        }
+    }
+    return seq;
+}
+
+function arpRateMs() {
+    const beatMs = 60000 / arp.bpm;
+    switch (arp.rate) {
+        case '1/4': return beatMs;
+        case '1/8': return beatMs / 2;
+        case '1/16': return beatMs / 4;
+        default: return beatMs / 2;
+    }
+}
+
+function arpTick() {
+    const seq = getArpSequence();
+    if (seq.length === 0) {
+        if (arpCurrentNote >= 0) {
+            rawNoteOff(arpCurrentNote);
+            arpCurrentNote = -1;
+        }
+        return;
+    }
+
+    // Release previous note
+    if (arpCurrentNote >= 0) rawNoteOff(arpCurrentNote);
+
+    // Determine next index based on pattern
+    switch (arp.pattern) {
+        case 'up':
+            arpIndex = (arpIndex + 1) % seq.length;
+            break;
+        case 'down':
+            arpIndex = (arpIndex - 1 + seq.length) % seq.length;
+            break;
+        case 'updown':
+            arpIndex += arpDirection;
+            if (arpIndex >= seq.length) {
+                arpDirection = -1;
+                arpIndex = Math.max(seq.length - 2, 0);
+            } else if (arpIndex < 0) {
+                arpDirection = 1;
+                arpIndex = Math.min(1, seq.length - 1);
+            }
+            break;
+        case 'random':
+            arpIndex = Math.floor(Math.random() * seq.length);
+            break;
+    }
+
+    arpIndex = Math.min(arpIndex, seq.length - 1);
+    const note = seq[arpIndex];
+    rawNoteOn(note, 100);
+    arpCurrentNote = note;
+}
+
+function startArpTimer() {
+    stopArpTimer();
+    arpIndex = -1; // will advance to 0 on first tick
+    arpDirection = 1;
+    arpTick(); // play immediately
+    arpTimer = setInterval(arpTick, arpRateMs());
+}
+
+function stopArpTimer() {
+    if (arpTimer) clearInterval(arpTimer);
+    arpTimer = null;
+    if (arpCurrentNote >= 0) {
+        rawNoteOff(arpCurrentNote);
+        arpCurrentNote = -1;
+    }
+}
+
+function restartArpIfNeeded() {
+    if (arp.enabled && arpHeldNotes.length > 0) {
+        startArpTimer();
+    }
+}
+
 /** @type {Map<number, Voice>} Active voices keyed by MIDI note number */
 const voices = new Map();
 
@@ -201,7 +349,9 @@ function handleMidiMessage(event) {
     }
 }
 
-export function noteOn(note, velocity = 100) {
+// ── Raw note on/off (bypass pipeline — used by arpeggiator internally) ────────
+
+function rawNoteOn(note, velocity = 100) {
     if (!active || !audioCtx) return;
     if (voices.has(note)) {
         voices.get(note).release();
@@ -222,7 +372,7 @@ export function noteOn(note, velocity = 100) {
     if (onNoteCallback) onNoteCallback({ type: 'on', note, velocity });
 }
 
-export function noteOff(note) {
+function rawNoteOff(note) {
     if (!active) return;
     if (voices.has(note)) {
         voices.get(note).release();
@@ -231,6 +381,60 @@ export function noteOff(note) {
     activeNotes.delete(note);
 
     if (onNoteCallback) onNoteCallback({ type: 'off', note });
+}
+
+// ── Public noteOn / noteOff (with Scale Lock → Chord → Arp pipeline) ─────────
+
+export function noteOn(originalNote, velocity = 100) {
+    if (!active || !audioCtx) return;
+
+    // 1. Scale Lock
+    const quantized = quantizeNote(originalNote);
+
+    // 2. Chord expansion
+    const chordNotes = expandChord(quantized);
+
+    // 3. Arpeggiator
+    if (arp.enabled) {
+        // Store mapping and add to held set
+        arpOriginalHeld.set(originalNote, chordNotes);
+        for (const n of chordNotes) {
+            if (!arpHeldNotes.includes(n)) arpHeldNotes.push(n);
+        }
+        restartArpIfNeeded();
+        return;
+    }
+
+    // No arp — play all chord notes immediately
+    chordVoiceMap.set(originalNote, chordNotes);
+    for (const n of chordNotes) {
+        rawNoteOn(n, velocity);
+    }
+}
+
+export function noteOff(originalNote) {
+    if (!active) return;
+
+    if (arp.enabled) {
+        // Remove this key's notes from arp held set
+        const notes = arpOriginalHeld.get(originalNote) || [];
+        arpOriginalHeld.delete(originalNote);
+        for (const n of notes) {
+            const idx = arpHeldNotes.indexOf(n);
+            if (idx >= 0) arpHeldNotes.splice(idx, 1);
+        }
+        if (arpHeldNotes.length === 0) {
+            stopArpTimer();
+        }
+        return;
+    }
+
+    // No arp — release all chord notes
+    const notes = chordVoiceMap.get(originalNote) || [originalNote];
+    chordVoiceMap.delete(originalNote);
+    for (const n of notes) {
+        rawNoteOff(n);
+    }
 }
 
 function handleCC(cc, value) {
@@ -580,6 +784,76 @@ export function setMasterVolume(v) {
 // Octave shift
 export function setOctaveShift(n) {
     effectParams.octaveShift = n;
+}
+
+// ── Scale Lock Setters ────────────────────────────────────────────────────────
+
+export function setScaleLock(enabled) {
+    scaleLock.enabled = enabled;
+}
+
+export function setScaleRoot(root) {
+    scaleLock.root = root;
+}
+
+export function setScaleType(type) {
+    scaleLock.scale = type;
+}
+
+export function getScaleTypes() {
+    return Object.keys(SCALE_INTERVALS);
+}
+
+// ── Chord Mode Setters ────────────────────────────────────────────────────────
+
+export function setChordEnabled(enabled) {
+    chordMode.enabled = enabled;
+    if (!enabled) chordVoiceMap.clear();
+}
+
+export function setChordType(type) {
+    chordMode.type = type;
+}
+
+export function getChordTypes() {
+    return Object.keys(CHORD_INTERVALS);
+}
+
+// ── Arpeggiator Setters ───────────────────────────────────────────────────────
+
+export function setArpEnabled(enabled) {
+    arp.enabled = enabled;
+    if (!enabled) {
+        stopArpTimer();
+        arpHeldNotes = [];
+        arpOriginalHeld.clear();
+    }
+}
+
+export function setArpPattern(pattern) {
+    arp.pattern = pattern;
+    arpDirection = 1;
+}
+
+export function setArpRate(rate) {
+    arp.rate = rate;
+    if (arp.enabled && arpTimer) {
+        // Restart with new rate
+        clearInterval(arpTimer);
+        arpTimer = setInterval(arpTick, arpRateMs());
+    }
+}
+
+export function setArpBPM(bpm) {
+    arp.bpm = bpm;
+    if (arp.enabled && arpTimer) {
+        clearInterval(arpTimer);
+        arpTimer = setInterval(arpTick, arpRateMs());
+    }
+}
+
+export function setArpOctaves(n) {
+    arp.octaves = n;
 }
 
 // ── Looper ────────────────────────────────────────────────────────────────────

@@ -1108,3 +1108,194 @@ input[type="checkbox"]:checked::after {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Shader Layer Stack ───────────────────────────────────────────────────── */
+
+.shader-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding: 5px 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.shader-layer-row select {
+  padding: 3px 4px;
+  font-size: 9px;
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  max-width: 90px;
+}
+
+.shader-layer-row input[type="range"] {
+  width: 50px;
+  height: 3px;
+  flex-shrink: 0;
+}
+
+.shader-layer-num {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 10px;
+}
+
+.shader-layer-remove {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.shader-layer-remove:hover {
+  color: #ff5252;
+}
+
+.shader-layer-val {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--accent);
+  min-width: 22px;
+  text-align: right;
+}
+
+.shader-layer-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.shader-btn {
+  padding: 4px 8px;
+  font-size: 9px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.shader-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.shader-btn-primary {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+}
+
+.shader-btn-primary:hover {
+  filter: brightness(1.2);
+}
+
+/* ── GLSL Paste Modal ─────────────────────────────────────────────────────── */
+
+.glsl-modal {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text-primary);
+  padding: 0;
+  max-width: 520px;
+  width: 90vw;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.glsl-modal::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.glsl-modal-content {
+  padding: 20px 24px;
+}
+
+.glsl-modal-content h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.glsl-modal-content p {
+  margin: 0 0 14px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.glsl-modal-content code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.glsl-modal-content label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.glsl-modal-content input[type="text"] {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
+.glsl-modal-content textarea {
+  width: 100%;
+  padding: 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background: #0d0d0d;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: #e0e0e0;
+  resize: vertical;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+  tab-size: 2;
+}
+
+.glsl-error {
+  font-size: 10px;
+  color: #ff5252;
+  min-height: 14px;
+  margin-bottom: 8px;
+}
+
+.glsl-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.glsl-modal-buttons .shader-btn {
+  padding: 6px 14px;
+  font-size: 11px;
+}

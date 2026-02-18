@@ -14,10 +14,15 @@ import { analyzeFrame, resetAnalysis } from './audioReactive.js';
 import { perturbCoeffs } from './mouseInteraction.js';
 import { applyPostProcessing } from './postProcess.js';
 import { applySymmetry } from './symmetry.js';
-import { startMidi, stopMidi, isMidiActive, getMidiFrequencyData, getMidiTimeDomainData, getMidiSampleRate, getMidiBinCount, setMidiWaveform, getMidiActiveNotes, getMidiDevices, setNoteCallback, noteOn, noteOff, setFilterCutoff, setFilterQ, setFilterType, setDistortionDrive, setWahEnabled, setWahRate, setWahDepth, setWahBaseFreq, setDelayTime, setDelayFeedback, setDelayMix, setReverbMix, setReverbDecay, setADSR, setMasterVolume, setOctaveShift, startLooperRecording, stopLooperRecording, toggleLooperPlayback, stopLooper, getLooperState, setLooperCallback, startDrumSequencer, stopDrumSequencer, toggleDrumStep, setDrumBPM, setDrumVolume, clearDrumPattern, isDrumPlaying, setDrumStepCallback } from './midi.js';
+import { startMidi, stopMidi, isMidiActive, getMidiFrequencyData, getMidiTimeDomainData, getMidiSampleRate, getMidiBinCount, setMidiWaveform, getMidiActiveNotes, getMidiDevices, setNoteCallback, noteOn, noteOff, setFilterCutoff, setFilterQ, setFilterType, setDistortionDrive, setWahEnabled, setWahRate, setWahDepth, setWahBaseFreq, setDelayTime, setDelayFeedback, setDelayMix, setReverbMix, setReverbDecay, setADSR, setMasterVolume, setOctaveShift, setScaleLock, setScaleRoot, setScaleType, setChordEnabled, setChordType, setArpEnabled, setArpPattern, setArpRate, setArpBPM, setArpOctaves, startLooperRecording, stopLooperRecording, toggleLooperPlayback, stopLooper, getLooperState, setLooperCallback, startDrumSequencer, stopDrumSequencer, toggleDrumStep, setDrumBPM, setDrumVolume, clearDrumPattern, isDrumPlaying, setDrumStepCallback } from './midi.js';
 import { drawWaveform } from './waveformOverlay.js';
 import { playClickPerc } from './clickSound.js';
-import { initShaderFX, renderShaderFX, setShaderPreset, setShaderIntensity, destroyShaderFX } from './shaderFX.js';
+import {
+  initShaderFX, renderShaderFX, destroyShaderFX,
+  getShaderPresetNames, getCustomShaderNames, getAllShaderNames, getBlendModes, getMaxLayers,
+  addLayer, removeLayer, setLayerPreset, setLayerIntensity, setLayerBlendMode,
+  getLayers, importShadertoyGLSL, removeCustomShader
+} from './shaderFX.js';
 
 
 // ── Shared State ──────────────────────────────────────────────────────────────
@@ -856,6 +861,46 @@ setTimeout(() => {
     );
   }
 
+  // Scale Lock
+  document.getElementById('fx-scale-toggle').onchange = function () {
+    setScaleLock(this.checked);
+  };
+  document.getElementById('fx-scale-root').onchange = function () {
+    setScaleRoot(parseInt(this.value));
+  };
+  document.getElementById('fx-scale-type').onchange = function () {
+    setScaleType(this.value);
+  };
+
+  // Chord Mode
+  document.getElementById('fx-chord-toggle').onchange = function () {
+    setChordEnabled(this.checked);
+  };
+  document.getElementById('fx-chord-type').onchange = function () {
+    setChordType(this.value);
+  };
+
+  // Arpeggiator
+  document.getElementById('fx-arp-toggle').onchange = function () {
+    setArpEnabled(this.checked);
+  };
+  document.getElementById('fx-arp-pattern').onchange = function () {
+    setArpPattern(this.value);
+  };
+  document.getElementById('fx-arp-rate').onchange = function () {
+    setArpRate(this.value);
+  };
+  document.getElementById('fx-arp-bpm').oninput = function () {
+    const v = parseInt(this.value);
+    setArpBPM(v);
+    document.getElementById('fx-val-arp-bpm').textContent = v;
+  };
+  document.getElementById('fx-arp-octaves').oninput = function () {
+    const v = parseInt(this.value);
+    setArpOctaves(v);
+    document.getElementById('fx-val-arp-oct').textContent = v;
+  };
+
   // Filter
   document.getElementById('fx-filter-type').onchange = function () {
     setFilterType(this.value);
@@ -1035,16 +1080,122 @@ setTimeout(() => {
     }
   });
 
-  // ── Visual FX Shader Controls ────────────────────────────────────────
-  document.getElementById('shader-preset').onchange = function () {
-    setShaderPreset(this.value);
+  // ── Visual FX Shader Layer Controls ──────────────────────────────────
+  const shaderLayersEl = document.getElementById('shader-layers');
+  const PRESET_LABELS = {
+    kaleidoscope: 'Kaleidoscope', liquid: 'Liquid Warp', rgbShift: 'RGB Shift',
+    tunnel: 'Tunnel Zoom', pixelMosaic: 'Pixel Mosaic', edgeGlow: 'Edge Glow',
+    colorCycle: 'Color Cycle', glitch: 'Glitch',
+    domainWarp: 'Domain Warp', heatDistort: 'Heat Distort', voidRipple: 'Void Ripple'
   };
 
-  document.getElementById('shader-intensity').oninput = function () {
-    const v = parseFloat(this.value);
-    setShaderIntensity(v);
-    document.getElementById('shader-intensity-val').textContent = v.toFixed(2);
+  function buildPresetOptions() {
+    const builtIn = getShaderPresetNames();
+    const custom = getCustomShaderNames();
+    let html = '<option value="off">Off</option>';
+    builtIn.forEach(k => {
+      html += `<option value="${k}">${PRESET_LABELS[k] || k}</option>`;
+    });
+    if (custom.length) {
+      html += '<optgroup label="Custom">';
+      custom.forEach(k => { html += `<option value="${k}">${k}</option>`; });
+      html += '</optgroup>';
+    }
+    return html;
+  }
+
+  function renderShaderLayers() {
+    const lyrs = getLayers();
+    const blendModes = getBlendModes();
+    shaderLayersEl.innerHTML = '';
+    lyrs.forEach((layer, i) => {
+      const row = document.createElement('div');
+      row.className = 'shader-layer-row';
+      row.innerHTML = `
+        <span class="shader-layer-num">${i + 1}</span>
+        <select class="shader-layer-preset" data-idx="${i}">${buildPresetOptions()}</select>
+        <select class="shader-layer-blend" data-idx="${i}">
+          ${blendModes.map(m => `<option value="${m}"${m === layer.blendMode ? ' selected' : ''}>${m}</option>`).join('')}
+        </select>
+        <input type="range" class="shader-layer-intensity" data-idx="${i}" min="0" max="1" step="0.01" value="${layer.intensity}" />
+        <span class="shader-layer-val">${layer.intensity.toFixed(2)}</span>
+        <button class="shader-layer-remove" data-idx="${i}" title="Remove layer">✕</button>
+      `;
+      // Set selected preset
+      row.querySelector('.shader-layer-preset').value = layer.preset;
+      shaderLayersEl.appendChild(row);
+    });
+
+    // Bind events
+    shaderLayersEl.querySelectorAll('.shader-layer-preset').forEach(sel => {
+      sel.onchange = function () { setLayerPreset(+this.dataset.idx, this.value); };
+    });
+    shaderLayersEl.querySelectorAll('.shader-layer-blend').forEach(sel => {
+      sel.onchange = function () { setLayerBlendMode(+this.dataset.idx, this.value); };
+    });
+    shaderLayersEl.querySelectorAll('.shader-layer-intensity').forEach(slider => {
+      slider.oninput = function () {
+        const idx = +this.dataset.idx;
+        const v = parseFloat(this.value);
+        setLayerIntensity(idx, v);
+        this.nextElementSibling.textContent = v.toFixed(2);
+      };
+    });
+    shaderLayersEl.querySelectorAll('.shader-layer-remove').forEach(btn => {
+      btn.onclick = function () {
+        removeLayer(+this.dataset.idx);
+        renderShaderLayers();
+      };
+    });
+
+    // Toggle add button visibility
+    const addBtn = document.getElementById('shader-add-layer');
+    if (addBtn) addBtn.style.display = lyrs.length >= getMaxLayers() ? 'none' : '';
+  }
+
+  // Add layer button
+  document.getElementById('shader-add-layer').onclick = () => {
+    addLayer('off', 0.5, 'normal');
+    renderShaderLayers();
   };
+
+  // Start with one layer
+  addLayer('off', 0.5, 'normal');
+  renderShaderLayers();
+
+  // ── Paste GLSL Modal ────────────────────────────────────────────────────
+  const glslModal = document.getElementById('glsl-paste-modal');
+  const glslNameInput = document.getElementById('glsl-paste-name');
+  const glslCodeInput = document.getElementById('glsl-paste-code');
+  const glslError = document.getElementById('glsl-paste-error');
+
+  document.getElementById('shader-paste-glsl').onclick = () => {
+    glslNameInput.value = '';
+    glslCodeInput.value = '';
+    glslError.textContent = '';
+    glslModal.showModal();
+  };
+
+  document.getElementById('glsl-paste-cancel').onclick = () => glslModal.close();
+
+  document.getElementById('glsl-paste-import').onclick = () => {
+    const name = glslNameInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+    const code = glslCodeInput.value.trim();
+    if (!name) { glslError.textContent = 'Please enter a name'; return; }
+    if (!code) { glslError.textContent = 'Please paste GLSL code'; return; }
+    const result = importShadertoyGLSL(code, name);
+    if (result.success) {
+      glslModal.close();
+      renderShaderLayers();
+    } else {
+      glslError.textContent = result.error;
+    }
+  };
+
+  // Close modal on backdrop click
+  glslModal.addEventListener('click', (e) => {
+    if (e.target === glslModal) glslModal.close();
+  });
 
   // ── Computer Keyboard → MIDI Notes ────────────────────────────────────
   // Two rows: bottom row = white keys (C3 to E5), top row = sharps

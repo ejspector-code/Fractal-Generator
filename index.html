@@ -80,6 +80,104 @@
 
               <div class="midi-fx-divider"></div>
 
+              <!-- Scale Lock -->
+              <div class="midi-fx-group">
+                <div class="midi-fx-title">Scale</div>
+                <div class="midi-fx-control midi-fx-toggle-row">
+                  <label for="fx-scale-toggle">Lock</label>
+                  <input type="checkbox" id="fx-scale-toggle" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-scale-root">Root</label>
+                  <select id="fx-scale-root">
+                    <option value="0">C</option>
+                    <option value="1">C♯</option>
+                    <option value="2">D</option>
+                    <option value="3">D♯</option>
+                    <option value="4">E</option>
+                    <option value="5">F</option>
+                    <option value="6">F♯</option>
+                    <option value="7">G</option>
+                    <option value="8">G♯</option>
+                    <option value="9">A</option>
+                    <option value="10">A♯</option>
+                    <option value="11">B</option>
+                  </select>
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-scale-type">Type</label>
+                  <select id="fx-scale-type">
+                    <option value="major">Major</option>
+                    <option value="minor">Minor</option>
+                    <option value="pentatonic">Pentatonic</option>
+                    <option value="blues">Blues</option>
+                    <option value="dorian">Dorian</option>
+                    <option value="mixolydian">Mixolydian</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="midi-fx-divider"></div>
+
+              <!-- Chord Mode -->
+              <div class="midi-fx-group">
+                <div class="midi-fx-title">Chord</div>
+                <div class="midi-fx-control midi-fx-toggle-row">
+                  <label for="fx-chord-toggle">Enable</label>
+                  <input type="checkbox" id="fx-chord-toggle" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-chord-type">Type</label>
+                  <select id="fx-chord-type">
+                    <option value="major">Major</option>
+                    <option value="minor">Minor</option>
+                    <option value="7th">7th</option>
+                    <option value="min7">Min 7</option>
+                    <option value="sus4">Sus4</option>
+                    <option value="power">Power</option>
+                    <option value="dim">Dim</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="midi-fx-divider"></div>
+
+              <!-- Arpeggiator -->
+              <div class="midi-fx-group">
+                <div class="midi-fx-title">Arp</div>
+                <div class="midi-fx-control midi-fx-toggle-row">
+                  <label for="fx-arp-toggle">Enable</label>
+                  <input type="checkbox" id="fx-arp-toggle" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-arp-pattern">Pattern</label>
+                  <select id="fx-arp-pattern">
+                    <option value="up">Up</option>
+                    <option value="down">Down</option>
+                    <option value="updown">Up-Down</option>
+                    <option value="random">Random</option>
+                  </select>
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-arp-rate">Rate</label>
+                  <select id="fx-arp-rate">
+                    <option value="1/4">1/4</option>
+                    <option value="1/8" selected>1/8</option>
+                    <option value="1/16">1/16</option>
+                  </select>
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-arp-bpm">BPM <span class="fx-val" id="fx-val-arp-bpm">120</span></label>
+                  <input type="range" id="fx-arp-bpm" min="60" max="240" step="1" value="120" />
+                </div>
+                <div class="midi-fx-control">
+                  <label for="fx-arp-octaves">Oct <span class="fx-val" id="fx-val-arp-oct">1</span></label>
+                  <input type="range" id="fx-arp-octaves" min="1" max="3" step="1" value="1" />
+                </div>
+              </div>
+
+              <div class="midi-fx-divider"></div>
+
               <!-- Filter -->
               <div class="midi-fx-group">
                 <div class="midi-fx-title">Filter</div>
@@ -223,28 +321,34 @@
 
               <div class="midi-fx-divider"></div>
 
-              <!-- Visual FX Shaders -->
+              <!-- Visual FX Shader Layers -->
               <div class="midi-fx-group midi-fx-visualfx">
                 <div class="midi-fx-title">Visual FX</div>
-                <div class="midi-fx-control">
-                  <label for="shader-preset">Preset</label>
-                  <select id="shader-preset">
-                    <option value="off" selected>Off</option>
-                    <option value="kaleidoscope">Kaleidoscope</option>
-                    <option value="liquid">Liquid Warp</option>
-                    <option value="rgbShift">RGB Shift</option>
-                    <option value="tunnel">Tunnel Zoom</option>
-                    <option value="pixelMosaic">Pixel Mosaic</option>
-                    <option value="edgeGlow">Edge Glow</option>
-                    <option value="colorCycle">Color Cycle</option>
-                    <option value="glitch">Glitch</option>
-                  </select>
-                </div>
-                <div class="midi-fx-control">
-                  <label for="shader-intensity">Mix <span class="fx-val" id="shader-intensity-val">0.50</span></label>
-                  <input type="range" id="shader-intensity" min="0" max="1" step="0.01" value="0.5" />
+                <div id="shader-layers"></div>
+                <div class="shader-layer-actions">
+                  <button id="shader-add-layer" class="shader-btn" title="Add Layer">+ Layer</button>
+                  <button id="shader-paste-glsl" class="shader-btn" title="Paste Shadertoy GLSL">📋 Paste GLSL</button>
                 </div>
               </div>
+
+              <!-- Paste GLSL Modal -->
+              <dialog id="glsl-paste-modal" class="glsl-modal">
+                <div class="glsl-modal-content">
+                  <h3>Import Shader</h3>
+                  <p>Paste GLSL from Shadertoy or write your own. Shadertoy's <code>mainImage()</code> format is
+                    auto-detected.</p>
+                  <label for="glsl-paste-name">Name</label>
+                  <input type="text" id="glsl-paste-name" placeholder="my-shader" />
+                  <label for="glsl-paste-code">GLSL Code</label>
+                  <textarea id="glsl-paste-code" rows="12" spellcheck="false"
+                    placeholder="void mainImage(out vec4 fragColor, in vec2 fragCoord) {&#10;    vec2 uv = fragCoord / iResolution.xy;&#10;    fragColor = vec4(uv, 0.5, 1.0);&#10;}"></textarea>
+                  <div id="glsl-paste-error" class="glsl-error"></div>
+                  <div class="glsl-modal-buttons">
+                    <button id="glsl-paste-cancel" class="shader-btn">Cancel</button>
+                    <button id="glsl-paste-import" class="shader-btn shader-btn-primary">Import</button>
+                  </div>
+                </div>
+              </dialog>
 
             </div>
           </div>
