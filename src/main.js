@@ -16,6 +16,7 @@ import { applyPostProcessing } from './postProcess.js';
 import { applySymmetry } from './symmetry.js';
 import { startMidi, stopMidi, isMidiActive, getMidiFrequencyData, getMidiTimeDomainData, getMidiSampleRate, getMidiBinCount, setMidiWaveform, getMidiActiveNotes, getMidiDevices, setNoteCallback, noteOn, noteOff } from './midi.js';
 import { drawWaveform } from './waveformOverlay.js';
+import { playClickPerc } from './clickSound.js';
 
 
 // ── Shared State ──────────────────────────────────────────────────────────────
@@ -390,6 +391,12 @@ const sketch = (p) => {
     const my = p.mouseY;
     if (mx >= 0 && mx < p.width && my >= 0 && my < p.height) {
       initClickBurst(mx, my, p.width, state.colorParams);
+
+      // Play position-mapped percussion: hi-hat (top) → rimshot (mid) → kick (bottom)
+      const yRatio = my / p.height;
+      const xRatio = mx / p.width;
+      playClickPerc(yRatio, xRatio, 0.5);
+
       // In classic mode, force a few redraws so the burst animates
       if (state.renderMode === 'classic') {
         state.needsRedraw = true;
