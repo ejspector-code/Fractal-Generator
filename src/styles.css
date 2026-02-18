@@ -89,7 +89,8 @@ body {
 
 #canvas-container canvas {
   display: block;
-  border-radius: 4px;
+  width: 100% !important;
+  border-radius: 4px 4px 0 0;
   box-shadow: 0 0 60px rgba(0, 212, 255, 0.05);
 }
 

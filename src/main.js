@@ -212,24 +212,24 @@ animator.setBase(state.coeffs);
 // ── Canvas dimension helper ──────────────────────────────────────────────────
 
 function computeCanvasDims(ratio, maxW, maxH) {
-  const MAX_EDGE = 900;
   let w, h;
   switch (ratio) {
     case '16:9': {
-      w = Math.min(maxW, MAX_EDGE);
+      w = maxW;
       h = Math.round(w * 9 / 16);
       if (h > maxH) { h = maxH; w = Math.round(h * 16 / 9); }
       break;
     }
     case '9:16': {
-      h = Math.min(maxH, MAX_EDGE);
+      h = Math.min(maxH, maxW * 16 / 9);
       w = Math.round(h * 9 / 16);
       if (w > maxW) { w = maxW; h = Math.round(w * 16 / 9); }
       break;
     }
     default: { // 1:1
-      const size = Math.min(maxW, maxH, 800);
-      w = h = Math.max(size, 400);
+      w = maxW;
+      h = w;
+      if (h > maxH) { h = maxH; w = h; }
       break;
     }
   }
@@ -245,7 +245,7 @@ const sketch = (p) => {
   p.setup = () => {
     const container = document.getElementById('canvas-container');
     const area = document.getElementById('canvas-area');
-    const { w, h } = computeCanvasDims(state.aspectRatio, area.clientWidth - 40, area.clientHeight - 40);
+    const { w, h } = computeCanvasDims(state.aspectRatio, area.clientWidth, area.clientHeight - 40);
 
     const cnv = p.createCanvas(w, h);
     cnv.parent(container);
@@ -414,7 +414,7 @@ const sketch = (p) => {
   // Resize handling
   p.windowResized = () => {
     const area = document.getElementById('canvas-area');
-    const { w, h } = computeCanvasDims(state.aspectRatio, area.clientWidth - 40, area.clientHeight - 40);
+    const { w, h } = computeCanvasDims(state.aspectRatio, area.clientWidth, area.clientHeight - 40);
     p.resizeCanvas(w, h);
     resetParticles();
     state.needsRedraw = true;
