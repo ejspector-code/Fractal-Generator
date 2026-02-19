@@ -1208,6 +1208,59 @@ input[type="checkbox"]:checked::after {
   filter: brightness(1.2);
 }
 
+/* ── Custom Shader Library ────────────────────────────────────────────────── */
+
+.shader-library-header {
+  display: flex;
+  align-items: center;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.shader-library-label {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+}
+
+.shader-lib-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+  gap: 6px;
+}
+
+.shader-lib-name {
+  font-size: 9px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.shader-lib-delete {
+  background: none;
+  border: none;
+  color: rgba(255, 80, 80, 0.5);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.shader-lib-delete:hover {
+  color: #ff4444;
+  background: rgba(255, 68, 68, 0.15);
+}
+
 /* ── GLSL Paste Modal ─────────────────────────────────────────────────────── */
 
 .glsl-modal {

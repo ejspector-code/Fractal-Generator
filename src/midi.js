@@ -40,6 +40,7 @@ let delayWetGain = null;
 let reverbConvolver = null;
 let reverbDryGain = null;
 let reverbWetGain = null;
+let audioStreamDest = null;
 
 // Looper state
 let looperRecorder = null;
@@ -595,6 +596,10 @@ export async function startMidi() {
         masterGain.connect(analyser);
         analyser.connect(audioCtx.destination);
 
+        // Prepare audio stream destination for recording
+        audioStreamDest = audioCtx.createMediaStreamDestination();
+        masterGain.connect(audioStreamDest);
+
         frequencyData = new Uint8Array(analyser.frequencyBinCount);
         timeDomainData = new Uint8Array(analyser.fftSize);
 
@@ -854,6 +859,10 @@ export function setArpBPM(bpm) {
 
 export function setArpOctaves(n) {
     arp.octaves = n;
+}
+
+export function getAudioStream() {
+    return audioStreamDest ? audioStreamDest.stream : null;
 }
 
 // ── Looper ────────────────────────────────────────────────────────────────────

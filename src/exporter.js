@@ -54,9 +54,19 @@ export async function savePNG(canvas) {
     await saveFile(blob, filename, 'PNG Image', '.png', 'image/png');
 }
 
-export function startRecording(canvas, onStop) {
+export function startRecording(canvas, onStop, audioStream) {
     const stream = canvas.captureStream(30);
+
+    // Merge audio tracks if available
+    if (audioStream) {
+        for (const track of audioStream.getAudioTracks()) {
+            stream.addTrack(track);
+        }
+    }
+
     const mimeTypes = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
         'video/webm;codecs=vp9',
         'video/webm;codecs=vp8',
         'video/webm',

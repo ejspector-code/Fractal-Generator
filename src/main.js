@@ -14,7 +14,7 @@ import { analyzeFrame, resetAnalysis } from './audioReactive.js';
 import { perturbCoeffs } from './mouseInteraction.js';
 import { applyPostProcessing } from './postProcess.js';
 import { applySymmetry } from './symmetry.js';
-import { startMidi, stopMidi, isMidiActive, getMidiFrequencyData, getMidiTimeDomainData, getMidiSampleRate, getMidiBinCount, setMidiWaveform, getMidiActiveNotes, getMidiDevices, setNoteCallback, noteOn, noteOff, setFilterCutoff, setFilterQ, setFilterType, setDistortionDrive, setWahEnabled, setWahRate, setWahDepth, setWahBaseFreq, setDelayTime, setDelayFeedback, setDelayMix, setReverbMix, setReverbDecay, setADSR, setMasterVolume, setOctaveShift, setScaleLock, setScaleRoot, setScaleType, setChordEnabled, setChordType, setArpEnabled, setArpPattern, setArpRate, setArpBPM, setArpOctaves, startLooperRecording, stopLooperRecording, toggleLooperPlayback, stopLooper, getLooperState, setLooperCallback, startDrumSequencer, stopDrumSequencer, toggleDrumStep, setDrumBPM, setDrumVolume, clearDrumPattern, isDrumPlaying, setDrumStepCallback } from './midi.js';
+import { startMidi, stopMidi, isMidiActive, getMidiFrequencyData, getMidiTimeDomainData, getMidiSampleRate, getMidiBinCount, setMidiWaveform, getMidiActiveNotes, getMidiDevices, setNoteCallback, noteOn, noteOff, setFilterCutoff, setFilterQ, setFilterType, setDistortionDrive, setWahEnabled, setWahRate, setWahDepth, setWahBaseFreq, setDelayTime, setDelayFeedback, setDelayMix, setReverbMix, setReverbDecay, setADSR, setMasterVolume, setOctaveShift, setScaleLock, setScaleRoot, setScaleType, setChordEnabled, setChordType, setArpEnabled, setArpPattern, setArpRate, setArpBPM, setArpOctaves, getAudioStream, startLooperRecording, stopLooperRecording, toggleLooperPlayback, stopLooper, getLooperState, setLooperCallback, startDrumSequencer, stopDrumSequencer, toggleDrumStep, setDrumBPM, setDrumVolume, clearDrumPattern, isDrumPlaying, setDrumStepCallback } from './midi.js';
 import { drawWaveform } from './waveformOverlay.js';
 import { playClickPerc } from './clickSound.js';
 import {
@@ -633,7 +633,7 @@ setTimeout(() => {
       startRecording(canvas, () => {
         document.getElementById('btn-record').style.display = '';
         document.getElementById('btn-stop-record').style.display = 'none';
-      });
+      }, getAudioStream());
       document.getElementById('btn-record').style.display = 'none';
       document.getElementById('btn-stop-record').style.display = '';
       document.getElementById('btn-stop-record').classList.add('recording-pulse');
@@ -1086,7 +1086,9 @@ setTimeout(() => {
     kaleidoscope: 'Kaleidoscope', liquid: 'Liquid Warp', rgbShift: 'RGB Shift',
     tunnel: 'Tunnel Zoom', pixelMosaic: 'Pixel Mosaic', edgeGlow: 'Edge Glow',
     colorCycle: 'Color Cycle', glitch: 'Glitch',
-    domainWarp: 'Domain Warp', heatDistort: 'Heat Distort', voidRipple: 'Void Ripple'
+    domainWarp: 'Domain Warp', heatDistort: 'Heat Distort', voidRipple: 'Void Ripple',
+    starNest: 'Star Nest', plasmaGlobe: 'Plasma Globe', aurora: 'Aurora',
+    ocean: 'Ocean', warpTunnel: 'Warp Tunnel'
   };
 
   function buildPresetOptions() {
@@ -1186,7 +1188,24 @@ setTimeout(() => {
     const result = importShadertoyGLSL(code, name);
     if (result.success) {
       glslModal.close();
+
+      // Auto-apply: find first 'off' layer, or add a new one
+      const lyrs = getLayers();
+      let applied = false;
+      for (let i = 0; i < lyrs.length; i++) {
+        if (lyrs[i].preset === 'off') {
+          setLayerPreset(i, name);
+          setLayerIntensity(i, 0.5);
+          applied = true;
+          break;
+        }
+      }
+      if (!applied && lyrs.length < getMaxLayers()) {
+        addLayer(name, 0.5, 'normal');
+      }
+
       renderShaderLayers();
+      renderCustomShaderLibrary();
     } else {
       glslError.textContent = result.error;
     }
@@ -1196,6 +1215,37 @@ setTimeout(() => {
   glslModal.addEventListener('click', (e) => {
     if (e.target === glslModal) glslModal.close();
   });
+
+  // ── Custom Shader Library (saved shaders with delete) ───────────────────
+  const shaderLibraryEl = document.getElementById('custom-shader-library');
+  const shaderListEl = document.getElementById('custom-shader-list');
+
+  function renderCustomShaderLibrary() {
+    const names = getCustomShaderNames();
+    if (names.length === 0) {
+      shaderLibraryEl.style.display = 'none';
+      return;
+    }
+    shaderLibraryEl.style.display = '';
+    shaderListEl.innerHTML = '';
+    names.forEach(name => {
+      const row = document.createElement('div');
+      row.className = 'shader-lib-item';
+      row.innerHTML = `
+        <span class="shader-lib-name" title="${name}">${name}</span>
+        <button class="shader-lib-delete" title="Delete ${name}">✕</button>
+      `;
+      row.querySelector('.shader-lib-delete').onclick = () => {
+        removeCustomShader(name);
+        renderShaderLayers();
+        renderCustomShaderLibrary();
+      };
+      shaderListEl.appendChild(row);
+    });
+  }
+
+  // Initial render of custom shader library
+  renderCustomShaderLibrary();
 
   // ── Computer Keyboard → MIDI Notes ────────────────────────────────────
   // Two rows: bottom row = white keys (C3 to E5), top row = sharps

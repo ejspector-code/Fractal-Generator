@@ -34,6 +34,25 @@ let layers = [];  // { preset: string, intensity: number, blendMode: string }
 // Custom imported shaders
 const customShaders = {};  // name → GLSL source
 
+function saveCustomShadersToStorage() {
+    try {
+        const data = {};
+        for (const [k, v] of Object.entries(customShaders)) data[k] = v;
+        localStorage.setItem('fractal_custom_shaders', JSON.stringify(data));
+    } catch (e) { /* quota exceeded or private mode */ }
+}
+
+function loadCustomShadersFromStorage() {
+    try {
+        const raw = localStorage.getItem('fractal_custom_shaders');
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        for (const [name, src] of Object.entries(data)) {
+            customShaders[name] = src;
+        }
+    } catch (e) { /* corrupted data */ }
+}
+
 // ── Vertex Shader (shared) ────────────────────────────────────────────────────
 
 const VERT_SRC = `
@@ -422,6 +441,225 @@ const PRESETS = {
         float vignette = 1.0 - u_beat * u_intensity * 0.3 * smoothstep(0.3, 0.0, dist);
         gl_FragColor = color * vignette;
     }
+  `,
+
+    starNest: `
+    precision mediump float;
+    varying vec2 v_uv;
+    uniform sampler2D u_texture;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_bass;
+    uniform float u_energy;
+    uniform float u_intensity;
+
+    // Adapted from "Star Nest" by Pablo Roman Andrioli (Kali)
+    void main() {
+        vec2 uv = (v_uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0);
+        float t = u_time * 0.08 + u_bass * 0.3;
+        vec3 dir = normalize(vec3(uv * 2.0, 1.0));
+        vec3 from = vec3(0.0, 0.0, t);
+        float volsteps = 0.0;
+        float s = 0.1;
+        float fade = 0.8;
+        vec3 v = vec3(0.0);
+        for (int r = 0; r < 12; r++) {
+            vec3 p = from + s * dir * 0.5;
+            p = abs(vec3(1.2) - mod(p, vec3(2.4)));
+            float pa, a = pa = 0.0;
+            for (int i = 0; i < 10; i++) {
+                p = abs(p) / dot(p, p) - 0.62;
+                a += abs(length(p) - pa);
+                pa = length(p);
+            }
+            a *= a * a;
+            v += fade * vec3(s, s * s, s * s * s * s) * a * 0.0025;
+            fade *= 0.73;
+            s += 0.12;
+        }
+        v = clamp(v, 0.0, 1.0);
+        vec4 orig = texture2D(u_texture, v_uv);
+        gl_FragColor = mix(orig, vec4(v * (1.0 + u_energy), 1.0), u_intensity);
+    }
+  `,
+
+    plasmaGlobe: `
+    precision mediump float;
+    varying vec2 v_uv;
+    uniform sampler2D u_texture;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_bass;
+    uniform float u_treble;
+    uniform float u_energy;
+    uniform float u_beat;
+    uniform float u_intensity;
+
+    float noise(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+    }
+
+    void main() {
+        vec2 uv = (v_uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0);
+        float t = u_time * 0.6 + u_bass;
+        float dist = length(uv);
+        float glow = 0.0;
+
+        for (int i = 0; i < 6; i++) {
+            float fi = float(i) * 1.047 + t;
+            vec2 dir = vec2(cos(fi), sin(fi));
+            float bolt = abs(dot(uv, dir));
+            float wave = sin(dot(uv, dir.yx) * 12.0 + t * 3.0 + float(i)) * 0.03;
+            bolt = 0.004 / (bolt + wave + 0.001);
+            bolt *= smoothstep(0.65, 0.0, dist);
+            glow += bolt;
+        }
+
+        float core = 0.02 / (dist + 0.02);
+        float pulse = 1.0 + u_beat * 0.5;
+        vec3 col = vec3(0.3, 0.5, 1.0) * glow * pulse + vec3(0.6, 0.8, 1.0) * core;
+        col += vec3(0.8, 0.4, 1.0) * u_treble * glow * 0.3;
+        col = clamp(col, 0.0, 1.0);
+
+        vec4 orig = texture2D(u_texture, v_uv);
+        gl_FragColor = mix(orig, vec4(col, 1.0), u_intensity);
+    }
+  `,
+
+    aurora: `
+    precision mediump float;
+    varying vec2 v_uv;
+    uniform sampler2D u_texture;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_bass;
+    uniform float u_mid;
+    uniform float u_energy;
+    uniform float u_intensity;
+
+    void main() {
+        vec2 uv = v_uv;
+        float t = u_time * 0.3;
+        float ar = u_resolution.x / u_resolution.y;
+        vec2 p = (uv - 0.5) * vec2(ar, 1.0);
+
+        float aurora = 0.0;
+        vec3 col = vec3(0.0);
+        for (int i = 0; i < 5; i++) {
+            float fi = float(i);
+            float y = p.y + 0.15 + fi * 0.06;
+            float wave = sin(p.x * 3.0 + t + fi * 0.7) * 0.08;
+            wave += sin(p.x * 7.0 - t * 1.3 + fi) * 0.03;
+            wave += sin(p.x * 13.0 + t * 0.7 + fi * 2.0) * 0.015;
+            wave += u_bass * sin(p.x * 5.0 + t * 2.0) * 0.04;
+            float band = 0.005 / (abs(y + wave) + 0.005);
+            float hue = fi * 0.2 + t * 0.1 + p.x * 0.3;
+            vec3 c = 0.5 + 0.5 * cos(6.28 * (hue + vec3(0.0, 0.33, 0.67)));
+            col += c * band * (0.5 + u_energy * 0.5);
+        }
+
+        col *= smoothstep(0.5, 0.0, abs(p.y + 0.1)) * 1.5;
+        col = clamp(col, 0.0, 1.0);
+
+        vec4 orig = texture2D(u_texture, v_uv);
+        gl_FragColor = mix(orig, vec4(col, 1.0), u_intensity);
+    }
+  `,
+
+    ocean: `
+    precision mediump float;
+    varying vec2 v_uv;
+    uniform sampler2D u_texture;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_bass;
+    uniform float u_energy;
+    uniform float u_intensity;
+
+    // Caustic pattern
+    float caustic(vec2 p, float t) {
+        float c = 0.0;
+        vec2 i = p;
+        for (int n = 0; n < 4; n++) {
+            float ft = t * (1.0 - 0.15 * float(n));
+            i = p + vec2(
+                cos(i.x + ft) + cos(i.y + ft) + sin(ft * 0.3),
+                sin(i.x - ft) + sin(i.y + ft * 0.7) + cos(ft * 0.5)
+            );
+            c += 1.0 / length(vec2(
+                p.x / (sin(i.x + ft) + 1.5),
+                p.y / (cos(i.y + ft * 0.8) + 1.5)
+            ));
+        }
+        c /= 4.0;
+        return clamp(c * c * 0.06, 0.0, 1.0);
+    }
+
+    void main() {
+        vec2 uv = v_uv;
+        float t = u_time * 0.4 + u_bass * 0.5;
+        float ar = u_resolution.x / u_resolution.y;
+        vec2 p = (uv - 0.5) * vec2(ar, 1.0) * 3.0;
+
+        float c = caustic(p, t);
+
+        // Refract the source texture
+        vec2 refract = vec2(
+            sin(uv.y * 20.0 + t * 2.0) * 0.005,
+            cos(uv.x * 18.0 + t * 1.5) * 0.005
+        ) * u_intensity;
+
+        vec4 orig = texture2D(u_texture, uv + refract);
+        vec3 water = vec3(0.05, 0.3, 0.5) + vec3(0.3, 0.6, 0.7) * c * (1.0 + u_energy);
+        gl_FragColor = mix(orig, vec4(orig.rgb + water * 0.7, 1.0), u_intensity);
+    }
+  `,
+
+    warpTunnel: `
+    precision mediump float;
+    varying vec2 v_uv;
+    uniform sampler2D u_texture;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_bass;
+    uniform float u_energy;
+    uniform float u_beat;
+    uniform float u_intensity;
+
+    void main() {
+        vec2 uv = (v_uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0);
+        float t = u_time * 0.5 + u_beat * 0.3;
+        float dist = length(uv);
+        float angle = atan(uv.y, uv.x);
+
+        // Tunnel coordinates
+        float tunnel_z = 0.5 / (dist + 0.01) + t * 2.0;
+        float tunnel_a = angle / 3.14159 + t * 0.1;
+
+        // Streaks
+        float streaks = 0.0;
+        for (int i = 0; i < 8; i++) {
+            float fi = float(i);
+            float a = fi * 0.785 + t * 0.3;
+            float streak = abs(sin(angle * 4.0 + a));
+            streak = 0.01 / (streak + 0.01);
+            streak *= smoothstep(0.5, 0.0, dist);
+            streak *= (0.5 + 0.5 * sin(tunnel_z * 2.0 + fi));
+            streaks += streak * 0.08;
+        }
+
+        // Speed lines
+        float speed = 0.03 / (dist + 0.03);
+        speed *= 1.0 + u_energy * 2.0;
+
+        vec3 col = vec3(0.2, 0.5, 1.0) * streaks;
+        col += vec3(0.8, 0.9, 1.0) * speed * 0.3;
+        col += vec3(0.4, 0.2, 0.8) * u_bass * speed * 0.5;
+        col = clamp(col, 0.0, 1.0);
+
+        vec4 orig = texture2D(u_texture, v_uv);
+        gl_FragColor = mix(orig, vec4(col, 1.0), u_intensity);
+    }
   `
 };
 
@@ -663,6 +901,9 @@ export function initShaderFX(p5Canvas) {
     }
 
     startTime = performance.now();
+
+    // Restore custom shaders from localStorage
+    loadCustomShadersFromStorage();
 }
 
 // ── Layer Management ──────────────────────────────────────────────────────────
@@ -749,6 +990,7 @@ export function importShadertoyGLSL(source, name) {
         delete customShaders[name];
         return { success: false, error: 'Shader compilation failed — check console for details' };
     }
+    saveCustomShadersToStorage();
     return { success: true, name };
 }
 
@@ -758,6 +1000,7 @@ export function removeCustomShader(name) {
         delete programs[name];
     }
     delete customShaders[name];
+    saveCustomShadersToStorage();
     // Remove from any layers using it
     layers.forEach(l => {
         if (l.preset === name) l.preset = 'off';
@@ -798,7 +1041,11 @@ export function renderShaderFX(p5Canvas, audioFeatures) {
     if (activeLayers.length === 1) {
         const layer = activeLayers[0];
         const prog = getProgram(layer.preset);
-        if (!prog) return;
+        if (!prog) {
+            // Shader failed — hide overlay so fractal stays visible
+            glCanvas.style.display = 'none';
+            return;
+        }
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.clearColor(0, 0, 0, 0);
