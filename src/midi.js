@@ -477,6 +477,10 @@ export async function startMidi() {
 
     try {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // iOS/iPadOS requires resume() from a user gesture to unlock audio
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
 
         // ── Build effects chain ──────────────────────────────────────────────
 

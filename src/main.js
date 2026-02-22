@@ -1240,17 +1240,30 @@ setTimeout(() => {
     }
   };
 
-  // Auto-start MIDI with effects drawer open
-  setTimeout(() => {
+  // Auto-start MIDI: on iOS/iPadOS, defer until first user gesture to unlock AudioContext
+  function autoStartMidi() {
     midiToggle.checked = true;
     midiToggle.onchange.call(midiToggle).then(() => {
-      // Open the effects drawer
       const dc = document.getElementById('midi-drawer-content');
       const dt = document.getElementById('midi-drawer-toggle');
       dc.classList.add('open');
       dt.classList.add('open');
     });
-  }, 500);
+  }
+
+  const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if (isTouchDevice) {
+    // Wait for first user gesture to unlock AudioContext on iOS
+    const unlockAudio = () => {
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('click', unlockAudio);
+      autoStartMidi();
+    };
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click', unlockAudio, { once: true });
+  } else {
+    setTimeout(autoStartMidi, 500);
+  }
 
   document.getElementById('midi-waveform').onchange = function () {
     setMidiWaveform(this.value);

@@ -386,6 +386,10 @@ export async function startGuitar() {
 
     try {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // iOS/iPadOS requires resume() from a user gesture to unlock audio
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
 
         // Input gain — where all strings connect
         inputGain = audioCtx.createGain();
