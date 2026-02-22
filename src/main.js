@@ -1807,27 +1807,27 @@ setTimeout(() => {
     }
   };
 
-  // Guitar fretboard click-to-pluck interaction
-  guitarFretboardViz.addEventListener('mousedown', (e) => {
-    if (!isGuitarActive()) return;
+  // Guitar fretboard click/touch-to-pluck interaction
+  function getGuitarStringFromPointer(clientX, clientY) {
     const rect = guitarFretboardViz.getBoundingClientRect();
-    const y = e.clientY - rect.top;
+    const y = clientY - rect.top;
     const h = rect.height;
     const topPad = 12;
     const bottomPad = 12;
     const playAreaH = h - topPad - bottomPad;
     const stringSpacing = playAreaH / 5;
-
-    // Find nearest string
     const relY = y - topPad;
-    const stringIndex = Math.round(relY / stringSpacing);
-    const clamped = Math.max(0, Math.min(5, stringIndex));
-
-    // Velocity based on how far right they click (left = soft, right = hard)
-    const x = e.clientX - rect.left;
+    const stringIndex = Math.max(0, Math.min(5, Math.round(relY / stringSpacing)));
+    const x = clientX - rect.left;
     const velocity = 0.4 + (x / rect.width) * 0.5;
+    return { stringIndex, velocity };
+  }
 
-    pluckString(clamped, velocity);
+  // Mouse: pluck on click
+  guitarFretboardViz.addEventListener('mousedown', (e) => {
+    if (!isGuitarActive()) return;
+    const { stringIndex, velocity } = getGuitarStringFromPointer(e.clientX, e.clientY);
+    pluckString(stringIndex, velocity);
     state.needsRedraw = true;
   });
 
@@ -1844,22 +1844,48 @@ setTimeout(() => {
   });
   guitarFretboardViz.addEventListener('mousemove', (e) => {
     if (!guitarDragging || !isGuitarActive()) return;
-    const rect = guitarFretboardViz.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const h = rect.height;
-    const topPad = 12;
-    const playAreaH = h - topPad - 12;
-    const stringSpacing = playAreaH / 5;
-    const relY = y - topPad;
-    const stringIndex = Math.max(0, Math.min(5, Math.round(relY / stringSpacing)));
-
+    const { stringIndex, velocity } = getGuitarStringFromPointer(e.clientX, e.clientY);
     if (stringIndex !== lastDragString) {
-      const x = e.clientX - rect.left;
-      const velocity = 0.4 + (x / rect.width) * 0.5;
       pluckString(stringIndex, velocity);
       lastDragString = stringIndex;
       state.needsRedraw = true;
     }
+  });
+
+  // Touch: pluck on touch, drag-to-strum on touchmove
+  guitarFretboardViz.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (!isGuitarActive()) return;
+    guitarDragging = true;
+    lastDragString = -1;
+    const touch = e.touches[0];
+    const { stringIndex, velocity } = getGuitarStringFromPointer(touch.clientX, touch.clientY);
+    pluckString(stringIndex, velocity);
+    lastDragString = stringIndex;
+    state.needsRedraw = true;
+  }, { passive: false });
+
+  guitarFretboardViz.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (!guitarDragging || !isGuitarActive()) return;
+    const touch = e.touches[0];
+    const { stringIndex, velocity } = getGuitarStringFromPointer(touch.clientX, touch.clientY);
+    if (stringIndex !== lastDragString) {
+      pluckString(stringIndex, velocity);
+      lastDragString = stringIndex;
+      state.needsRedraw = true;
+    }
+  }, { passive: false });
+
+  guitarFretboardViz.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    guitarDragging = false;
+    lastDragString = -1;
+  });
+
+  guitarFretboardViz.addEventListener('touchcancel', () => {
+    guitarDragging = false;
+    lastDragString = -1;
   });
 
   // Strum buttons
@@ -2200,15 +2226,15 @@ setTimeout(() => {
     }
   });
 
-  // ── Click-to-Play on Piano Visualizer ─────────────────────────────────
+  // ── Click/Touch-to-Play on Piano Visualizer ─────────────────────────────
   const pianoCanvas = document.getElementById('midi-keyboard-viz');
   let pianoMouseDown = false;
   let lastClickedNote = -1;
 
-  function getNoteFromClick(e) {
+  function getNoteFromPointer(clientX, clientY) {
     const rect = pianoCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
     const w = rect.width;
     const h = rect.height;
 
@@ -2252,10 +2278,11 @@ setTimeout(() => {
     return -1;
   }
 
+  // Mouse events
   pianoCanvas.addEventListener('mousedown', (e) => {
     if (!isMidiActive()) return;
     pianoMouseDown = true;
-    const note = getNoteFromClick(e);
+    const note = getNoteFromPointer(e.clientX, e.clientY);
     if (note >= 0) {
       lastClickedNote = note;
       voiceNoteOn(note, 100);
@@ -2264,7 +2291,7 @@ setTimeout(() => {
 
   pianoCanvas.addEventListener('mousemove', (e) => {
     if (!pianoMouseDown || !isMidiActive()) return;
-    const note = getNoteFromClick(e);
+    const note = getNoteFromPointer(e.clientX, e.clientY);
     if (note >= 0 && note !== lastClickedNote) {
       if (lastClickedNote >= 0) voiceNoteOff(lastClickedNote);
       lastClickedNote = note;
@@ -2280,6 +2307,44 @@ setTimeout(() => {
 
   pianoCanvas.addEventListener('mouseleave', () => {
     if (pianoMouseDown && lastClickedNote >= 0) voiceNoteOff(lastClickedNote);
+    pianoMouseDown = false;
+    lastClickedNote = -1;
+  });
+
+  // Touch events (iPad / mobile)
+  pianoCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // prevent scroll while playing keys
+    if (!isMidiActive()) return;
+    pianoMouseDown = true;
+    const touch = e.touches[0];
+    const note = getNoteFromPointer(touch.clientX, touch.clientY);
+    if (note >= 0) {
+      lastClickedNote = note;
+      voiceNoteOn(note, 100);
+    }
+  }, { passive: false });
+
+  pianoCanvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (!pianoMouseDown || !isMidiActive()) return;
+    const touch = e.touches[0];
+    const note = getNoteFromPointer(touch.clientX, touch.clientY);
+    if (note >= 0 && note !== lastClickedNote) {
+      if (lastClickedNote >= 0) voiceNoteOff(lastClickedNote);
+      lastClickedNote = note;
+      voiceNoteOn(note, 100);
+    }
+  }, { passive: false });
+
+  pianoCanvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (lastClickedNote >= 0) voiceNoteOff(lastClickedNote);
+    pianoMouseDown = false;
+    lastClickedNote = -1;
+  });
+
+  pianoCanvas.addEventListener('touchcancel', () => {
+    if (lastClickedNote >= 0) voiceNoteOff(lastClickedNote);
     pianoMouseDown = false;
     lastClickedNote = -1;
   });
