@@ -1,3 +1,5 @@
+import { ensureUnlocked, unregisterContext } from './iosAudioUnlock.js';
+
 /**
  * Guitar Simulator — Karplus-Strong string synthesis using Web Audio API.
  * Produces realistic plucked-string tones entirely via synthesis (no samples).
@@ -386,10 +388,8 @@ export async function startGuitar() {
 
     try {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        // iOS/iPadOS requires resume() from a user gesture to unlock audio
-        if (audioCtx.state === 'suspended') {
-            await audioCtx.resume();
-        }
+        // iOS/iPadOS: unlock via silent buffer + resume
+        await ensureUnlocked(audioCtx);
 
         // Input gain — where all strings connect
         inputGain = audioCtx.createGain();
@@ -438,6 +438,7 @@ function cleanup() {
     try { pedals.phaser.lfo?.stop(); } catch (e) { }
     try { pedals.tremolo.lfo?.stop(); } catch (e) { }
     if (audioCtx) {
+        unregisterContext(audioCtx);
         audioCtx.close().catch(() => { });
         audioCtx = null;
     }

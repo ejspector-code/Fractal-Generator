@@ -3,6 +3,8 @@
  * Uses AnalyserNode for real-time FFT frequency data.
  */
 
+import { ensureUnlocked, unregisterContext } from './iosAudioUnlock.js';
+
 let audioContext = null;
 let analyser = null;
 let mediaStream = null;
@@ -24,10 +26,8 @@ export async function startAudio() {
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        // iOS/iPadOS requires resume() from a user gesture to unlock audio
-        if (audioContext.state === 'suspended') {
-            await audioContext.resume();
-        }
+        // iOS/iPadOS: unlock via silent buffer + resume
+        await ensureUnlocked(audioContext);
         const source = audioContext.createMediaStreamSource(mediaStream);
 
         analyser = audioContext.createAnalyser();
@@ -69,6 +69,7 @@ function cleanup() {
         mediaStream = null;
     }
     if (audioContext) {
+        unregisterContext(audioContext);
         audioContext.close().catch(() => { });
         audioContext = null;
     }

@@ -1,3 +1,5 @@
+import { ensureUnlocked, registerContext, unregisterContext } from './iosAudioUnlock.js';
+
 /**
  * MIDI Keyboard Synthesizer — Web MIDI API + Web Audio API polyphonic synth.
  * Generates real audio from MIDI input and exposes an AnalyserNode for FFT data,
@@ -477,10 +479,8 @@ export async function startMidi() {
 
     try {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        // iOS/iPadOS requires resume() from a user gesture to unlock audio
-        if (audioCtx.state === 'suspended') {
-            await audioCtx.resume();
-        }
+        // iOS/iPadOS: unlock via silent buffer + resume (simple resume is not enough)
+        await ensureUnlocked(audioCtx);
 
         // ── Build effects chain ──────────────────────────────────────────────
 
@@ -669,6 +669,7 @@ function cleanup() {
     }
 
     if (audioCtx) {
+        unregisterContext(audioCtx);
         audioCtx.close().catch(() => { });
         audioCtx = null;
     }

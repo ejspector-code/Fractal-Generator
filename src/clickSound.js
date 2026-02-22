@@ -9,11 +9,15 @@
  * No audio files needed — everything is synthesized in real-time.
  */
 
+import { ensureUnlocked } from './iosAudioUnlock.js';
+
 let ctx = null;
 
 function getCtx() {
     if (!ctx || ctx.state === 'closed') {
         ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // Register for iOS unlock (silent buffer trick)
+        ensureUnlocked(ctx);
     }
     // Resume suspended context (browser autoplay policy)
     if (ctx.state === 'suspended') ctx.resume();
