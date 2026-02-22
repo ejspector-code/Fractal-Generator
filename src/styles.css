@@ -1769,3 +1769,207 @@ input[type="checkbox"]:checked::after {
   border-color: rgba(0, 212, 255, 0.4);
   box-shadow: 0 0 6px rgba(0, 212, 255, 0.15);
 }
+
+/* ── Touch Mode — iPad-friendly overrides ────────────────────────────────── */
+
+/* Toggle button active state */
+#touch-mode-btn.btn-accent {
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* Range slider — thumbs to 44px (Apple HIG minimum) */
+.touch-mode input[type="range"] {
+  height: 10px;
+  border-radius: 5px;
+}
+
+.touch-mode input[type="range"]::-webkit-slider-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  margin-top: -17px;
+  box-shadow: 0 0 12px var(--accent-glow), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.touch-mode input[type="range"]::-moz-range-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--accent-glow), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Checkbox toggle — bigger */
+.touch-mode input[type="checkbox"] {
+  width: 48px;
+  height: 28px;
+  border-radius: 14px;
+}
+
+.touch-mode input[type="checkbox"]::after {
+  width: 22px;
+  height: 22px;
+  top: 3px;
+  left: 3px;
+}
+
+.touch-mode input[type="checkbox"]:checked::after {
+  transform: translateX(20px);
+}
+
+/* Buttons — larger tap targets */
+.touch-mode .btn {
+  padding: 12px 16px;
+  font-size: 14px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.touch-mode .btn-sm {
+  padding: 10px 14px;
+  font-size: 13px;
+  min-height: 44px;
+}
+
+/* Preset buttons — bigger and easier to tap */
+.touch-mode .presets-grid {
+  gap: 8px;
+}
+
+.touch-mode .preset-btn {
+  padding: 14px 8px;
+  font-size: 13px;
+  min-height: 48px;
+}
+
+/* Control group spacing */
+.touch-mode .control-group {
+  margin-bottom: 18px;
+}
+
+.touch-mode .control-group label {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.touch-mode .value-display {
+  font-size: 13px;
+}
+
+/* Section titles */
+.touch-mode .section-title {
+  font-size: 13px;
+  padding: 12px 20px;
+}
+
+/* Panel padding */
+.touch-mode .panel-section {
+  padding: 16px 20px;
+}
+
+.touch-mode #panel-header {
+  padding: 20px 20px 16px;
+}
+
+/* Selects — bigger touch targets */
+.touch-mode select {
+  padding: 12px 14px;
+  font-size: 14px;
+  min-height: 44px;
+}
+
+/* Text inputs */
+.touch-mode input[type="number"],
+.touch-mode input[type="text"] {
+  padding: 12px 14px;
+  font-size: 14px;
+  min-height: 44px;
+}
+
+/* Color inputs */
+.touch-mode input[type="color"] {
+  height: 44px;
+}
+
+/* Wider scrollbar for finger dragging */
+.touch-mode #panel-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+
+.touch-mode #panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+}
+
+/* Seed navigation */
+.touch-mode .seed-nav {
+  gap: 8px;
+}
+
+.touch-mode .seed-display {
+  font-size: 28px;
+  padding: 14px;
+}
+
+/* Toggle rows */
+.touch-mode .toggle-row label {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+/* Drawer handles — bigger tap area */
+.touch-mode .midi-drawer-handle {
+  padding: 12px 0;
+  font-size: 12px;
+}
+
+/* MIDI effects controls — larger */
+.touch-mode .midi-fx-control label {
+  font-size: 13px;
+}
+
+/* Palette swatches */
+.touch-mode .palette-swatch {
+  padding: 12px 10px;
+  font-size: 12px;
+  min-height: 44px;
+}
+
+/* Pedal knobs — larger */
+.touch-mode .pedal-knob input[type="range"]::-webkit-slider-thumb {
+  width: 20px;
+  height: 20px;
+}
+
+/* Shader layer rows */
+.touch-mode .shader-layer-row {
+  padding: 10px 10px;
+  margin-bottom: 8px;
+}
+
+.touch-mode .shader-layer-row select {
+  min-height: 40px;
+  font-size: 13px;
+}
+
+/* Anim controls */
+.touch-mode .anim-controls {
+  gap: 8px;
+}
+
+/* Voice mode options */
+.touch-mode .voice-mode-opt span {
+  padding: 8px 16px;
+  font-size: 13px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Guitar controls */
+.touch-mode .guitar-controls-row {
+  gap: 16px;
+  padding: 12px 16px;
+}

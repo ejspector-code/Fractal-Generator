@@ -624,11 +624,21 @@
                 <div class="midi-looper-status" id="fx-looper-status">Idle</div>
               </div>
 
-              <div class="midi-fx-divider"></div>
+            </div>
+          </div>
+        </div>
 
-              <!-- Visual FX Shader Layers -->
+        <!-- Visual FX Drawer -->
+        <div id="vfx-drawer" style="display:none;">
+          <button id="vfx-drawer-toggle" class="midi-drawer-handle vfx-drawer-handle"
+            aria-label="Toggle visual effects drawer">
+            <span class="midi-drawer-handle-bar"></span>
+            <span class="midi-drawer-label">🎨 Visual FX</span>
+            <span class="midi-drawer-handle-bar"></span>
+          </button>
+          <div id="vfx-drawer-content" class="midi-drawer-content">
+            <div class="midi-fx-row">
               <div class="midi-fx-group midi-fx-visualfx">
-                <div class="midi-fx-title">Visual FX</div>
                 <div id="shader-layers"></div>
                 <div class="shader-layer-actions">
                   <button id="shader-add-layer" class="shader-btn" title="Add Layer">+ Layer</button>
@@ -641,28 +651,27 @@
                   <div id="custom-shader-list"></div>
                 </div>
               </div>
-
-              <!-- Paste GLSL Modal -->
-              <dialog id="glsl-paste-modal" class="glsl-modal">
-                <div class="glsl-modal-content">
-                  <h3>Import Shader</h3>
-                  <p>Paste GLSL from Shadertoy or write your own. Shadertoy's <code>mainImage()</code> format is
-                    auto-detected.</p>
-                  <label for="glsl-paste-name">Name</label>
-                  <input type="text" id="glsl-paste-name" placeholder="my-shader" />
-                  <label for="glsl-paste-code">GLSL Code</label>
-                  <textarea id="glsl-paste-code" rows="12" spellcheck="false"
-                    placeholder="void mainImage(out vec4 fragColor, in vec2 fragCoord) {&#10;    vec2 uv = fragCoord / iResolution.xy;&#10;    fragColor = vec4(uv, 0.5, 1.0);&#10;}"></textarea>
-                  <div id="glsl-paste-error" class="glsl-error"></div>
-                  <div class="glsl-modal-buttons">
-                    <button id="glsl-paste-cancel" class="shader-btn">Cancel</button>
-                    <button id="glsl-paste-import" class="shader-btn shader-btn-primary">Import</button>
-                  </div>
-                </div>
-              </dialog>
-
             </div>
           </div>
+
+          <!-- Paste GLSL Modal -->
+          <dialog id="glsl-paste-modal" class="glsl-modal">
+            <div class="glsl-modal-content">
+              <h3>Import Shader</h3>
+              <p>Paste GLSL from Shadertoy or write your own. Shadertoy's <code>mainImage()</code> format is
+                auto-detected.</p>
+              <label for="glsl-paste-name">Name</label>
+              <input type="text" id="glsl-paste-name" placeholder="my-shader" />
+              <label for="glsl-paste-code">GLSL Code</label>
+              <textarea id="glsl-paste-code" rows="12" spellcheck="false"
+                placeholder="void mainImage(out vec4 fragColor, in vec2 fragCoord) {&#10;    vec2 uv = fragCoord / iResolution.xy;&#10;    fragColor = vec4(uv, 0.5, 1.0);&#10;}"></textarea>
+              <div id="glsl-paste-error" class="glsl-error"></div>
+              <div class="glsl-modal-buttons">
+                <button id="glsl-paste-cancel" class="shader-btn">Cancel</button>
+                <button id="glsl-paste-import" class="shader-btn shader-btn-primary">Import</button>
+              </div>
+            </div>
+          </dialog>
         </div>
       </div>
       <div id="fps-counter">0 FPS</div>
@@ -671,8 +680,16 @@
     <!-- Control Panel -->
     <aside id="panel">
       <header id="panel-header">
-        <h1>Fractal Generator</h1>
-        <p class="subtitle" id="attractor-subtitle">Strange Attractors</p>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <h1>Fractal Generator</h1>
+            <p class="subtitle" id="attractor-subtitle">Strange Attractors</p>
+          </div>
+          <button id="touch-mode-btn" class="btn btn-sm" title="Toggle Touch Mode (iPad)"
+            style="flex-shrink:0;font-size:16px;padding:4px 8px;line-height:1;">
+            👆
+          </button>
+        </div>
       </header>
 
       <div id="panel-scroll">
@@ -704,6 +721,7 @@
               <option value="aizawa">🔮 Aizawa</option>
               <option value="buddhabrot">👻 Buddhabrot</option>
               <option value="burningship">🔥 Burning Ship</option>
+              <option value="mandelbrot">🌀 Mandelbrot / Julia</option>
               <option value="curlnoise">🌫️ Curl Noise</option>
             </select>
           </div>
@@ -891,6 +909,40 @@
             <label for="bs-center-y">Center Y <span class="value-display" id="val-bs-cy">-0.60</span></label>
             <input type="range" id="bs-center-y" min="-1.5" max="1.5" step="0.01" value="-0.6" />
           </div>
+        </section>
+
+        <!-- Mandelbrot / Julia Controls -->
+        <section class="panel-section" id="mandelbrot-coeffs" style="display:none;">
+          <h2 class="section-title">Parameters</h2>
+          <div class="control-group">
+            <label for="mb-maxiter">Max Iterations <span class="value-display" id="val-mb-maxiter">256</span></label>
+            <input type="range" id="mb-maxiter" min="50" max="2000" step="10" value="256" />
+          </div>
+          <div class="control-group">
+            <label for="mb-zoom">Zoom <span class="value-display" id="val-mb-zoom">1.00</span></label>
+            <input type="range" id="mb-zoom" min="0" max="100" step="0.1" value="5.4" />
+          </div>
+          <div class="control-group">
+            <label for="mb-center-x">Center X <span class="value-display" id="val-mb-cx">-0.50</span></label>
+            <input type="range" id="mb-center-x" min="-2.5" max="1.5" step="0.001" value="-0.5" />
+          </div>
+          <div class="control-group">
+            <label for="mb-center-y">Center Y <span class="value-display" id="val-mb-cy">0.00</span></label>
+            <input type="range" id="mb-center-y" min="-1.5" max="1.5" step="0.001" value="0" />
+          </div>
+          <div class="control-group toggle-row">
+            <label for="mb-julia">Julia Mode</label>
+            <input type="checkbox" id="mb-julia" />
+          </div>
+          <div class="control-group" id="mb-julia-params" style="display:none;">
+            <label for="mb-julia-r">Julia Re <span class="value-display" id="val-mb-jr">-0.70</span></label>
+            <input type="range" id="mb-julia-r" min="-2" max="2" step="0.001" value="-0.7" />
+          </div>
+          <div class="control-group" id="mb-julia-params-i" style="display:none;">
+            <label for="mb-julia-i">Julia Im <span class="value-display" id="val-mb-ji">0.27</span></label>
+            <input type="range" id="mb-julia-i" min="-2" max="2" step="0.001" value="0.27015" />
+          </div>
+          <button class="action-btn" id="randomize-mandelbrot-btn">🎲 Randomize</button>
         </section>
 
         <!-- Curl Noise Controls -->

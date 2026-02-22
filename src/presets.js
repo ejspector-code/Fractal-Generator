@@ -66,6 +66,21 @@ export const BURNINGSHIP_PRESETS = [
   { name: 'Deep Keel', maxIter: 2000, samples: 200000, anti: false, centerX: -0.4, centerY: -0.6, zoom: 1.5 },
 ];
 
+export const MANDELBROT_PRESETS = [
+  { name: 'Full Set', maxIter: 256, centerX: -0.5, centerY: 0.0, zoom: 1.0, julia: false, juliaR: -0.7, juliaI: 0.27015 },
+  { name: 'Seahorse Valley', maxIter: 512, centerX: -0.745, centerY: 0.186, zoom: 80.0, julia: false, juliaR: -0.7, juliaI: 0.27015 },
+  { name: 'Elephant Valley', maxIter: 512, centerX: 0.282, centerY: 0.0072, zoom: 100.0, julia: false, juliaR: -0.7, juliaI: 0.27015 },
+  { name: 'Spiral Canyon', maxIter: 800, centerX: -0.7463, centerY: 0.1102, zoom: 500.0, julia: false, juliaR: -0.7, juliaI: 0.27015 },
+  { name: 'Mini-brot', maxIter: 1000, centerX: -1.749, centerY: 0.0, zoom: 200.0, julia: false, juliaR: -0.7, juliaI: 0.27015 },
+  { name: 'Lightning', maxIter: 800, centerX: -0.1625, centerY: 1.028, zoom: 50.0, julia: false, juliaR: -0.7, juliaI: 0.27015 },
+  { name: 'Julia Spiral', maxIter: 512, centerX: 0.0, centerY: 0.0, zoom: 1.2, julia: true, juliaR: -0.7269, juliaI: 0.1889 },
+  { name: 'Dendrite', maxIter: 512, centerX: 0.0, centerY: 0.0, zoom: 1.2, julia: true, juliaR: 0.0, juliaI: 1.0 },
+  { name: 'Douady Rabbit', maxIter: 512, centerX: 0.0, centerY: 0.0, zoom: 1.2, julia: true, juliaR: -0.123, juliaI: 0.745 },
+  { name: 'Siegel Disk', maxIter: 512, centerX: 0.0, centerY: 0.0, zoom: 1.5, julia: true, juliaR: -0.391, juliaI: -0.587 },
+  { name: 'Galaxy Dust', maxIter: 512, centerX: 0.0, centerY: 0.0, zoom: 1.2, julia: true, juliaR: 0.355, juliaI: 0.355 },
+  { name: 'San Marco', maxIter: 512, centerX: 0.0, centerY: 0.0, zoom: 1.3, julia: true, juliaR: -0.75, juliaI: 0.0 },
+];
+
 export const CURLNOISE_PRESETS = [
   { name: 'Nebula', scale: 1.5, octaves: 4, lacunarity: 2.0, gain: 0.5, speed: 0.5 },
   { name: 'Silk Smoke', scale: 2.5, octaves: 3, lacunarity: 2.0, gain: 0.5, speed: 0.3 },

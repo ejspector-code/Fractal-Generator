@@ -3,7 +3,7 @@
  * Supports Classic (density), Particles, and Vapor render modes.
  * Works with de Jong, Clifford, Lorenz, Aizawa, Buddhabrot, Burning Ship, and Curl Noise.
  */
-import { computeDensityHistogram, stepPoint, toScreen, getInitialPosition, buddhabrotOrbit, burningShipOrbit } from './attractor.js';
+import { computeDensityHistogram, stepPoint, toScreen, getInitialPosition, buddhabrotOrbit, burningShipOrbit, mandelbrotOrbit } from './attractor.js';
 import { applyMouseForce } from './mouseInteraction.js';
 
 // ─── Color Utilities ──────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ function toneMap(value, maxValue, mode) {
 // ─── Helper: is this type orbit-based (Buddhabrot-style)? ─────────────────────
 
 function isOrbitType(type) {
-    return type === 'buddhabrot' || type === 'burningship';
+    return type === 'buddhabrot' || type === 'burningship' || type === 'mandelbrot';
 }
 
 /** Get the correct params for the current attractor type */
@@ -126,6 +126,7 @@ function getParams(state) {
         case 'curlnoise': return state.curlNoiseParams;
         case 'buddhabrot': return state.buddhabrotParams;
         case 'burningship': return state.burningShipParams;
+        case 'mandelbrot': return state.mandelbrotParams;
         default: return state.coeffs;
     }
 }
@@ -135,25 +136,96 @@ function getOrbit(state, w, h) {
     if (state.attractorType === 'burningship') {
         return burningShipOrbit(state.burningShipParams, w, h);
     }
+    if (state.attractorType === 'mandelbrot') {
+        return mandelbrotOrbit(state.mandelbrotParams, w, h);
+    }
     return buddhabrotOrbit(state.buddhabrotParams, w, h);
 }
 
 /** Get orbit params for orbit-based types */
 function getOrbitParams(state) {
     if (state.attractorType === 'burningship') return state.burningShipParams;
+    if (state.attractorType === 'mandelbrot') return state.mandelbrotParams;
     return state.buddhabrotParams;
 }
 
 // ─── Classic Renderer ─────────────────────────────────────────────────────────
+
+// Mandelbrot Web Worker state
+let _mbWorker = null;
+let _mbCachedHistogram = null;
+let _mbLastParamHash = '';
+let _mbWorkerBusy = false;
+let _mbPendingMsg = null; // queued message if worker is busy
+
+/** Create a hash string from Mandelbrot params + dimensions to detect changes */
+function _mbParamHash(params, w, h) {
+    return `${params.maxIter}|${params.centerX}|${params.centerY}|${params.zoom}|${params.julia}|${params.juliaR}|${params.juliaI}|${w}|${h}`;
+}
+
+/** Lazily create the Mandelbrot worker */
+function _getMbWorker() {
+    if (!_mbWorker) {
+        _mbWorker = new Worker(new URL('./mandelbrotWorker.js', import.meta.url), { type: 'module' });
+        _mbWorker.onmessage = (e) => {
+            _mbCachedHistogram = e.data.buffer;
+            _mbWorkerBusy = false;
+            // If params changed while we were computing, re-dispatch immediately
+            if (_mbPendingMsg) {
+                const msg = _mbPendingMsg;
+                _mbPendingMsg = null;
+                _mbWorkerBusy = true;
+                _mbWorker.postMessage(msg);
+            }
+        };
+    }
+    return _mbWorker;
+}
+
+/** Dispatch Mandelbrot computation to worker */
+function _mbDispatch(params, w, h) {
+    const msg = { params: { ...params }, width: w, height: h };
+    if (_mbWorkerBusy) {
+        // Queue latest — worker will pick it up when done
+        _mbPendingMsg = msg;
+    } else {
+        _mbWorkerBusy = true;
+        _mbPendingMsg = null;
+        _getMbWorker().postMessage(msg);
+    }
+}
 
 export function renderClassic(p, state) {
     const { attractorType, classicParams, colorParams, bgColor, diffusion } = state;
     const w = p.width;
     const h = p.height;
 
-    const params = getParams(state);
-    const iterations = Math.round(Math.pow(10, classicParams.iterationsPow));
-    const histogram = computeDensityHistogram(attractorType, params, w, h, iterations);
+    let histogram;
+
+    if (attractorType === 'mandelbrot') {
+        // ── Async worker path for Mandelbrot/Julia ───────────────────────────
+        const params = getParams(state);
+        const hash = _mbParamHash(params, w, h);
+
+        if (hash !== _mbLastParamHash) {
+            _mbLastParamHash = hash;
+            _mbDispatch(params, w, h);
+        }
+
+        if (_mbCachedHistogram && _mbCachedHistogram.length === w * h) {
+            histogram = _mbCachedHistogram;
+        } else {
+            // No cache yet — render background color and wait
+            const bg = hexToRgb(bgColor);
+            p.background(bg.r, bg.g, bg.b);
+            return;
+        }
+    } else {
+        // ── Synchronous path for all other attractors ────────────────────────
+        const params = getParams(state);
+        const iterations = Math.round(Math.pow(10, classicParams.iterationsPow));
+        histogram = computeDensityHistogram(attractorType, params, w, h, iterations);
+    }
 
     // Find max density
     let maxDensity = 0;

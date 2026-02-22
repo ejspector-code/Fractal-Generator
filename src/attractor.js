@@ -1,6 +1,6 @@
 /**
  * Attractor engine — supports Peter de Jong, Clifford, Lorenz, Aizawa,
- * Buddhabrot, Burning Ship, and Curl Noise.
+ * Buddhabrot, Burning Ship, Mandelbrot/Julia, and Curl Noise.
  *
  * Peter de Jong:
  *   x_{n+1} = sin(a · y_n) - cos(b · x_n)
@@ -354,6 +354,134 @@ export function burningShipOrbit(params, width, height) {
     return [];
 }
 
+// ─── Mandelbrot / Julia Set ───────────────────────────────────────────────────
+
+/**
+ * Compute Mandelbrot/Julia escape-time density (per-pixel).
+ * Each pixel maps to a complex number. We iterate z = z² + c and
+ * store a smooth iteration count in the density buffer.
+ *
+ * Mandelbrot mode: c = pixel, z₀ = 0
+ * Julia mode: z₀ = pixel, c = fixed (juliaR + i·juliaI)
+ *
+ * @param {object} params - { maxIter, centerX, centerY, zoom, julia, juliaR, juliaI }
+ * @param {number} width
+ * @param {number} height
+ * @param {Uint32Array} buffer
+ */
+function computeMandelbrotDensity(params, width, height, buffer) {
+    if (!params) return buffer;
+    const { maxIter, centerX, centerY, zoom, julia, juliaR, juliaI } = params;
+
+    // Map the visible region to the complex plane
+    const aspect = width / height;
+    const scale = 3.0 / zoom;
+    const minR = centerX - scale * aspect / 2;
+    const minI = centerY - scale / 2;
+    const stepR = (scale * aspect) / width;
+    const stepI = scale / height;
+
+    const log2 = Math.log(2);
+
+    for (let py = 0; py < height; py++) {
+        const ci_base = minI + py * stepI;
+        for (let px = 0; px < width; px++) {
+            const cr_base = minR + px * stepR;
+
+            let zr, zi, cr, ci;
+            if (julia) {
+                zr = cr_base;
+                zi = ci_base;
+                cr = juliaR;
+                ci = juliaI;
+            } else {
+                zr = 0;
+                zi = 0;
+                cr = cr_base;
+                ci = ci_base;
+            }
+
+            let iter = 0;
+            let zr2 = zr * zr;
+            let zi2 = zi * zi;
+
+            while (zr2 + zi2 <= 4.0 && iter < maxIter) {
+                zi = 2 * zr * zi + ci;
+                zr = zr2 - zi2 + cr;
+                zr2 = zr * zr;
+                zi2 = zi * zi;
+                iter++;
+            }
+
+            if (iter < maxIter) {
+                // Smooth coloring: fractional escape count normalized to 0-1
+                const log_zn = Math.log(zr2 + zi2) / 2;
+                const nu = Math.log(log_zn / log2) / log2;
+                const smooth = iter + 1 - nu;
+                // Normalize to 0-1000 range for density mapping compatibility
+                // Use cyclic mapping for richer color variation
+                const t = (smooth / maxIter);
+                buffer[py * width + px] = Math.floor(t * 1000) + 1;
+            }
+            // Interior (non-escaping) stays 0
+        }
+    }
+
+    return buffer;
+}
+
+/**
+ * Trace a single Mandelbrot/Julia escape orbit for Particles/Vapor rendering.
+ * Returns an array of {x, y} screen coordinates.
+ */
+export function mandelbrotOrbit(params, width, height) {
+    if (!params) return [];
+    const { maxIter, centerX, centerY, zoom, julia, juliaR, juliaI } = params;
+    const aspect = width / height;
+    const scale = 3.0 / zoom;
+    const minR = centerX - scale * aspect / 2;
+    const minI = centerY - scale / 2;
+
+    for (let attempt = 0; attempt < 200; attempt++) {
+        let cr, ci, zr, zi;
+
+        if (julia) {
+            // Julia: vary z₀, fix c
+            zr = minR + Math.random() * scale * aspect;
+            zi = minI + Math.random() * scale;
+            cr = juliaR;
+            ci = juliaI;
+        } else {
+            // Mandelbrot: vary c, z₀ = 0
+            cr = -2.5 + Math.random() * 4;
+            ci = -2 + Math.random() * 4;
+            zr = 0;
+            zi = 0;
+        }
+
+        let escaped = false;
+        const points = [];
+
+        for (let i = 0; i < maxIter; i++) {
+            const zr2 = zr * zr;
+            const zi2 = zi * zi;
+            if (zr2 + zi2 > 4) { escaped = true; break; }
+            const newZr = zr2 - zi2 + cr;
+            zi = 2 * zr * zi + ci;
+            zr = newZr;
+            points.push({ x: zr, y: zi });
+        }
+
+        if (escaped && points.length > 5) {
+            return points.map(p => ({
+                x: ((p.x - minR) / (scale * aspect)) * width,
+                y: ((p.y - minI) / scale) * height,
+            }));
+        }
+    }
+    return [];
+}
+
 // ─── Curl Noise Flow Field ────────────────────────────────────────────────────
 
 /**
@@ -440,7 +568,7 @@ function curlNoiseStep(params, x, y, time) {
 
 /**
  * Compute a density histogram.
- * @param {string} attractorType - 'dejong' | 'clifford' | 'lorenz' | 'aizawa' | 'buddhabrot' | 'burningship' | 'curlnoise'
+ * @param {string} attractorType - 'dejong' | 'clifford' | 'lorenz' | 'aizawa' | 'buddhabrot' | 'burningship' | 'mandelbrot' | 'curlnoise'
  * @param {object} params
  * @param {number} width
  * @param {number} height
@@ -454,6 +582,9 @@ export function computeDensityHistogram(attractorType, params, width, height, it
     }
     if (attractorType === 'burningship') {
         return computeBurningShipDensity(params, width, height, buffer);
+    }
+    if (attractorType === 'mandelbrot') {
+        return computeMandelbrotDensity(params, width, height, buffer);
     }
     if (attractorType === 'lorenz') {
         return computeLorenzDensity(params, width, height, iterations, buffer);

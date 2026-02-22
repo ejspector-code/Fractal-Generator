@@ -660,6 +660,276 @@ const PRESETS = {
         vec4 orig = texture2D(u_texture, v_uv);
         gl_FragColor = mix(orig, vec4(col, 1.0), u_intensity);
     }
+  `,
+
+    // ── Shadertoy Ports ──────────────────────────────────────────────────────
+    // Credit: Danilo Guanabara (Silexars) — shadertoy.com/view/XsXXDn
+    // License: CC BY-NC-SA 3.0
+
+    stCreation: `
+    precision mediump float;
+    varying vec2 v_uv;
+    uniform sampler2D u_texture;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_intensity;
+
+    void main() {
+        vec3 c;
+        float l, z = u_time;
+        for (int i = 0; i < 3; i++) {
+            vec2 uv, p = v_uv;
+            uv = p;
+            p -= 0.5;
+            p.x *= u_resolution.x / u_resolution.y;
+            z += 0.07;
+            l = length(p);
+            uv += p / l * (sin(z) + 1.0) * abs(sin(l * 9.0 - z - z));
+            c[i] = 0.01 / length(mod(uv, 1.0) - 0.5);
+        }
+        vec4 effect = vec4(c / l, 1.0);
+        vec4 orig = texture2D(u_texture, v_uv);
+        gl_FragColor = mix(orig, effect, u_intensity);
+    }
+  `,
+
+    // Credit: Martijn Steinrucken (BigWIngs) — shadertoy.com/view/MdXSzS
+    // License: CC BY-NC-SA 3.0
+
+    stUniverseWithin: `
+    precision mediump float;
+    varying vec2 v_uv;
+    uniform sampler2D u_texture;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_bass;
+    uniform float u_intensity;
+
+    #define NUM_LAYERS 4.0
+
+    float N21(vec2 p) {
+        vec3 a = fract(vec3(p.xyx) * vec3(213.897, 653.453, 253.098));
+        a += dot(a, a.yzx + 79.76);
+        return fract((a.x + a.y) * a.z);
+    }
+    vec2 GetPos(vec2 id, vec2 offs, float t) {
+        float n = N21(id + offs);
+        float n1 = fract(n * 10.0);
+        float n2 = fract(n * 100.0);
+        float a = t + n;
+        return offs + vec2(sin(a * n1), cos(a * n2)) * 0.4;
+    }
+    float df_line(in vec2 a, in vec2 b, in vec2 p) {
+        vec2 pa = p - a, ba = b - a;
+        float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+        return length(pa - ba * h);
+    }
+    float line(vec2 a, vec2 b, vec2 uv) {
+        float d = df_line(a, b, uv);
+        float d2 = length(a - b);
+        float fade = smoothstep(1.5, 0.5, d2);
+        fade += smoothstep(0.05, 0.02, abs(d2 - 0.75));
+        return smoothstep(0.04, 0.01, d) * fade;
+    }
+    float NetLayer(vec2 st, float n, float t) {
+        vec2 id = floor(st) + n;
+        st = fract(st) - 0.5;
+        // Unrolled array fill — WebGL 1 forbids dynamic array indexing
+        vec2 p0 = GetPos(id, vec2(-1.0, -1.0), t);
+        vec2 p1 = GetPos(id, vec2( 0.0, -1.0), t);
+        vec2 p2 = GetPos(id, vec2( 1.0, -1.0), t);
+        vec2 p3 = GetPos(id, vec2(-1.0,  0.0), t);
+        vec2 p4 = GetPos(id, vec2( 0.0,  0.0), t);
+        vec2 p5 = GetPos(id, vec2( 1.0,  0.0), t);
+        vec2 p6 = GetPos(id, vec2(-1.0,  1.0), t);
+        vec2 p7 = GetPos(id, vec2( 0.0,  1.0), t);
+        vec2 p8 = GetPos(id, vec2( 1.0,  1.0), t);
+        float m = 0.0;
+        // Center connections + point glow for each of 9 points
+        m += line(p4, p0, st); { float d = length(st - p0); m += (0.005 / (d * d)) * smoothstep(1.0, 0.7, d) * pow(sin((fract(p0.x) + fract(p0.y) + t) * 5.0) * 0.4 + 0.6, 20.0); }
+        m += line(p4, p1, st); { float d = length(st - p1); m += (0.005 / (d * d)) * smoothstep(1.0, 0.7, d) * pow(sin((fract(p1.x) + fract(p1.y) + t) * 5.0) * 0.4 + 0.6, 20.0); }
+        m += line(p4, p2, st); { float d = length(st - p2); m += (0.005 / (d * d)) * smoothstep(1.0, 0.7, d) * pow(sin((fract(p2.x) + fract(p2.y) + t) * 5.0) * 0.4 + 0.6, 20.0); }
+        m += line(p4, p3, st); { float d = length(st - p3); m += (0.005 / (d * d)) * smoothstep(1.0, 0.7, d) * pow(sin((fract(p3.x) + fract(p3.y) + t) * 5.0) * 0.4 + 0.6, 20.0); }
+        m += line(p4, p4, st); { float d = length(st - p4); m += (0.005 / (d * d)) * smoothstep(1.0, 0.7, d) * pow(sin((fract(p4.x) + fract(p4.y) + t) * 5.0) * 0.4 + 0.6, 20.0); }
+        m += line(p4, p5, st); { float d = length(st - p5); m += (0.005 / (d * d)) * smoothstep(1.0, 0.7, d) * pow(sin((fract(p5.x) + fract(p5.y) + t) * 5.0) * 0.4 + 0.6, 20.0); }
+        m += line(p4, p6, st); { float d = length(st - p6); m += (0.005 / (d * d)) * smoothstep(1.0, 0.7, d) * pow(sin((fract(p6.x) + fract(p6.y) + t) * 5.0) * 0.4 + 0.6, 20.0); }
+        m += line(p4, p7, st); { float d = length(st - p7); m += (0.005 / (d * d)) * smoothstep(1.0, 0.7, d) * pow(sin((fract(p7.x) + fract(p7.y) + t) * 5.0) * 0.4 + 0.6, 20.0); }
+        m += line(p4, p8, st); { float d = length(st - p8); m += (0.005 / (d * d)) * smoothstep(1.0, 0.7, d) * pow(sin((fract(p8.x) + fract(p8.y) + t) * 5.0) * 0.4 + 0.6, 20.0); }
+        // Perimeter lines
+        m += line(p1, p3, st) + line(p1, p5, st) + line(p7, p5, st) + line(p7, p3, st);
+        return m;
+    }
+    void main() {
+        vec2 uv = (v_uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0);
+        float t = u_time * 0.1 + u_bass * 0.2;
+        float cs = cos(t), sn = sin(t);
+        vec2 st = uv * mat2(cs, -sn, sn, cs);
+        float m = 0.0;
+        for (float i = 0.0; i < 1.0; i += 1.0 / NUM_LAYERS) {
+            float z = fract(t + i);
+            float size = mix(15.0, 1.0, z);
+            float fade = smoothstep(0.0, 0.6, z) * smoothstep(1.0, 0.8, z);
+            m += fade * NetLayer(st * size, i, u_time);
+        }
+        vec3 baseCol = vec3(sin(t) * 0.4 + 0.6, cos(t * 0.4) * 0.4 + 0.6, -sin(t * 0.24) * 0.4 + 0.6);
+        vec3 col = baseCol * m * (1.0 - dot(uv, uv));
+        vec4 orig = texture2D(u_texture, v_uv);
+        gl_FragColor = mix(orig, vec4(col, 1.0), u_intensity);
+    }
+  `,
+
+    // Credit: nimitz (twitter @stormoid) — shadertoy.com/view/WtdSDs
+    // License: CC BY-NC-SA 3.0
+
+    stProteanClouds: `
+    precision mediump float;
+    varying vec2 v_uv;
+    uniform sampler2D u_texture;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_bass;
+    uniform float u_energy;
+    uniform float u_intensity;
+
+    mat2 rot(in float a) { float c = cos(a), s = sin(a); return mat2(c, s, -s, c); }
+    float mag2(vec2 p) { return dot(p, p); }
+    float linstep(in float mn, in float mx, in float x) { return clamp((x - mn) / (mx - mn), 0.0, 1.0); }
+    vec2 disp(float t) { return vec2(sin(t * 0.22) * 1.0, cos(t * 0.175) * 1.0) * 2.0; }
+
+    vec2 mapClouds(vec3 p) {
+        // Nimitz's original noise field with rotation matrix
+        vec3 p2 = p;
+        p2.xy -= disp(p.z).xy;
+        p.xy *= rot(sin(p.z + u_time) * 0.1 + u_time * 0.09);
+        float cl = mag2(p2.xy);
+        float d = 0.0;
+        p *= 0.61;
+        float z = 1.0, trk = 1.0;
+        for (int i = 0; i < 5; i++) {
+            p += sin(p.zxy * 0.75 * trk + u_time * trk * 0.8) * 0.1;
+            d -= abs(dot(cos(p), sin(p.yzx)) * z);
+            z *= 0.57; trk *= 1.4;
+            // Inline rotation matrix multiply (nimitz's m3)
+            p = mat3(0.33338, 0.56034, -0.71817,
+                     -0.87887, 0.32651, -0.15323,
+                     0.15162, 0.69596, 0.61339) * p * 1.93;
+        }
+        return vec2(d + cl * 0.2 + 0.25, cl);
+    }
+    void main() {
+        vec2 p = (v_uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0);
+        float time = u_time * 3.0 + u_bass * 2.0;
+        vec3 ro = vec3(0.0, 0.0, time);
+        ro.xy += disp(ro.z) * 0.85;
+        vec3 target = normalize(ro - vec3(disp(time + 3.5) * 0.85, time + 3.5));
+        vec3 rightdir = normalize(cross(target, vec3(0.0, 1.0, 0.0)));
+        vec3 updir = normalize(cross(rightdir, target));
+        vec3 rd = normalize((p.x * rightdir + p.y * updir) * 1.0 - target);
+
+        vec4 rez = vec4(0.0);
+        float t = 1.5;
+        for (int i = 0; i < 80; i++) {
+            if (rez.a > 0.99) break;
+            vec3 pos = ro + t * rd;
+            vec2 mpv = mapClouds(pos);
+            float den = clamp(mpv.x - 0.3, 0.0, 1.0) * 1.12;
+            if (mpv.x > 0.6) {
+                vec4 col = vec4(sin(vec3(5.0, 0.4, 0.2) + mpv.y * 0.1 + sin(pos.z * 0.4) * 0.5 + 1.8) * 0.5 + 0.5, 0.08);
+                col.rgb *= linstep(4.0, -2.5, mpv.x) * 2.3;
+                rez = rez + col * den * (1.0 - rez.a);
+            }
+            t += clamp(0.5 - mpv.x * mpv.x * 0.05, 0.09, 0.3);
+        }
+        rez = clamp(rez, 0.0, 1.0);
+        vec4 orig = texture2D(u_texture, v_uv);
+        gl_FragColor = mix(orig, rez, u_intensity);
+    }
+  `,
+
+    // Cloud overlay — 2D FBM wisps inspired by iq's noise techniques
+    // Renders as a proper post-process overlay (not a standalone volumetric scene)
+
+    stClouds: `
+    precision mediump float;
+    varying vec2 v_uv;
+    uniform sampler2D u_texture;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_bass;
+    uniform float u_energy;
+    uniform float u_intensity;
+
+    float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+    }
+    float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        float a = hash(i);
+        float b = hash(i + vec2(1.0, 0.0));
+        float c = hash(i + vec2(0.0, 1.0));
+        float d = hash(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    }
+    float fbm(vec2 p) {
+        float v = 0.0, a = 0.5;
+        mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+        for (int i = 0; i < 6; i++) {
+            v += a * noise(p);
+            p = rot * p * 2.0 + 0.5;
+            a *= 0.5;
+        }
+        return v;
+    }
+    void main() {
+        vec2 uv = v_uv;
+        float ar = u_resolution.x / u_resolution.y;
+        vec2 p = (uv - 0.5) * vec2(ar, 1.0) * 3.0;
+        float t = u_time * 0.15;
+
+        // Layered cloud wisps with drift
+        float f1 = fbm(p + vec2(t, t * 0.7) + u_bass * 0.5);
+        float f2 = fbm(p * 1.5 + vec2(-t * 0.8, t * 0.5) + f1 * 1.5);
+        float f3 = fbm(p * 0.8 + vec2(t * 0.3, -t * 0.6) + f2 * 1.2);
+
+        // Combine into cloud density
+        float cloud = f1 * 0.3 + f2 * 0.4 + f3 * 0.3;
+        cloud = smoothstep(0.3, 0.8, cloud);
+        cloud *= (1.0 + u_energy * 0.5);
+
+        // Color the clouds — nebula-like palette
+        vec3 col1 = vec3(0.6, 0.3, 0.8); // purple
+        vec3 col2 = vec3(0.2, 0.5, 1.0); // blue
+        vec3 col3 = vec3(0.9, 0.4, 0.3); // warm
+        vec3 cloudColor = mix(col1, col2, f2);
+        cloudColor = mix(cloudColor, col3, f3 * 0.5);
+        cloudColor *= 0.8 + 0.4 * cloud;
+
+        vec4 orig = texture2D(u_texture, uv);
+        vec3 result = mix(orig.rgb, orig.rgb + cloudColor * cloud, u_intensity);
+        gl_FragColor = vec4(result, orig.a);
+    }
+  `,
+
+    // Film grain — classic Shadertoy post-processing effect
+    stFilmGrain: `
+    precision mediump float;
+    varying vec2 v_uv;
+    uniform sampler2D u_texture;
+    uniform float u_time;
+    uniform float u_intensity;
+
+    void main() {
+        vec4 orig = texture2D(u_texture, v_uv);
+        float strength = 16.0;
+        float x = (v_uv.x + 4.0) * (v_uv.y + 4.0) * (u_time * 10.0);
+        float grain = (mod((mod(x, 13.0) + 1.0) * (mod(x, 123.0) + 1.0), 0.01) - 0.005) * strength;
+        vec3 col = orig.rgb + vec3(grain) * u_intensity;
+        // Vignette
+        col *= pow(16.0 * v_uv.x * v_uv.y * (1.0 - v_uv.x) * (1.0 - v_uv.y), 0.1 * u_intensity);
+        gl_FragColor = vec4(col, orig.a);
+    }
   `
 };
 

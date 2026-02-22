@@ -2,7 +2,7 @@
  * UI Controller — wires DOM controls to app state.
  * Supports de Jong, Clifford, Lorenz, Aizawa, Buddhabrot, Burning Ship, and Curl Noise.
  */
-import { DEJONG_PRESETS, CLIFFORD_PRESETS, LORENZ_PRESETS, AIZAWA_PRESETS, BUDDHABROT_PRESETS, BURNINGSHIP_PRESETS, CURLNOISE_PRESETS, COLOR_PALETTES } from './presets.js';
+import { DEJONG_PRESETS, CLIFFORD_PRESETS, LORENZ_PRESETS, AIZAWA_PRESETS, BUDDHABROT_PRESETS, BURNINGSHIP_PRESETS, CURLNOISE_PRESETS, MANDELBROT_PRESETS, COLOR_PALETTES } from './presets.js';
 import { resetParticles } from './renderer.js';
 
 /**
@@ -35,10 +35,29 @@ export function initUI(state, onStateChange, animator) {
         if (e.key === 'Enter') $('seed-go').click();
     });
 
+    // ── Touch Mode Toggle ──────────────────────────────────────────────────────
+    const touchBtn = $('touch-mode-btn');
+    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const savedTouchMode = localStorage.getItem('fractal-touch-mode');
+    const enableTouch = savedTouchMode !== null ? savedTouchMode === 'true' : isTouch;
+
+    function setTouchMode(on) {
+        document.body.classList.toggle('touch-mode', on);
+        touchBtn.classList.toggle('btn-accent', on);
+        touchBtn.title = on ? 'Touch Mode ON' : 'Touch Mode OFF';
+        localStorage.setItem('fractal-touch-mode', on);
+    }
+    setTouchMode(enableTouch);
+
+    touchBtn.onclick = () => {
+        const isOn = document.body.classList.contains('touch-mode');
+        setTouchMode(!isOn);
+    };
+
     // ── All coefficient panel IDs ───────────────────────────────────────────────
     const allPanels = [
         'dejong-coeffs', 'clifford-coeffs', 'lorenz-coeffs', 'aizawa-coeffs',
-        'buddhabrot-coeffs', 'burningship-coeffs', 'curlnoise-coeffs'
+        'buddhabrot-coeffs', 'burningship-coeffs', 'mandelbrot-coeffs', 'curlnoise-coeffs'
     ];
 
     const panelMap = {
@@ -48,6 +67,7 @@ export function initUI(state, onStateChange, animator) {
         aizawa: 'aizawa-coeffs',
         buddhabrot: 'buddhabrot-coeffs',
         burningship: 'burningship-coeffs',
+        mandelbrot: 'mandelbrot-coeffs',
         curlnoise: 'curlnoise-coeffs',
     };
 
@@ -59,6 +79,7 @@ export function initUI(state, onStateChange, animator) {
         aizawa: 'Aizawa Attractor',
         buddhabrot: 'Buddhabrot',
         burningship: 'Burning Ship',
+        mandelbrot: 'Mandelbrot / Julia',
         curlnoise: 'Curl Noise Flow Field',
     };
 
@@ -101,6 +122,10 @@ export function initUI(state, onStateChange, animator) {
                 const { maxIter, zoom, centerX, centerY } = state.burningShipParams;
                 return { maxIter, zoom, centerX, centerY };
             }
+            case 'mandelbrot': {
+                const { maxIter, zoom, centerX, centerY, julia, juliaR, juliaI } = state.mandelbrotParams;
+                return { maxIter, zoom, centerX, centerY, julia, juliaR, juliaI };
+            }
             default: return state.coeffs;
         }
     }
@@ -122,6 +147,7 @@ export function initUI(state, onStateChange, animator) {
         aizawa: AIZAWA_PRESETS,
         buddhabrot: BUDDHABROT_PRESETS,
         burningship: BURNINGSHIP_PRESETS,
+        mandelbrot: MANDELBROT_PRESETS,
         curlnoise: CURLNOISE_PRESETS,
     };
 
@@ -168,6 +194,10 @@ export function initUI(state, onStateChange, animator) {
             case 'burningship':
                 state.burningShipParams = { ...state.burningShipParams, ...preset };
                 syncBurningShipSliders();
+                break;
+            case 'mandelbrot':
+                state.mandelbrotParams = { ...state.mandelbrotParams, ...preset };
+                syncMandelbrotSliders();
                 break;
             case 'curlnoise':
                 state.curlNoiseParams = { ...preset };
@@ -512,6 +542,99 @@ export function initUI(state, onStateChange, animator) {
         presetsGrid.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
     };
 
+    // ── Mandelbrot / Julia Controls ──────────────────────────────────────────────────
+    // Logarithmic zoom conversion: slider 0-100 ↔ zoom 0.5-100000
+    const ZOOM_MIN = 0.5, ZOOM_MAX = 100000;
+    const LOG_ZOOM_MIN = Math.log(ZOOM_MIN), LOG_ZOOM_MAX = Math.log(ZOOM_MAX);
+    function sliderToZoom(v) { return Math.exp(LOG_ZOOM_MIN + (v / 100) * (LOG_ZOOM_MAX - LOG_ZOOM_MIN)); }
+    function zoomToSlider(z) { return 100 * (Math.log(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z))) - LOG_ZOOM_MIN) / (LOG_ZOOM_MAX - LOG_ZOOM_MIN); }
+    function fmtZoom(z) { return z >= 100 ? Math.round(z).toLocaleString() : z.toFixed(2); }
+
+    function syncMandelbrotSliders() {
+        const mp = state.mandelbrotParams;
+        if (!mp) return;
+        $('mb-maxiter').value = mp.maxIter;
+        setVal('val-mb-maxiter', mp.maxIter);
+        $('mb-zoom').value = zoomToSlider(mp.zoom);
+        setVal('val-mb-zoom', fmtZoom(mp.zoom));
+        $('mb-center-x').value = mp.centerX;
+        setVal('val-mb-cx', mp.centerX);
+        $('mb-center-y').value = mp.centerY;
+        setVal('val-mb-cy', mp.centerY);
+        $('mb-julia').checked = mp.julia;
+        $('mb-julia-params').style.display = mp.julia ? '' : 'none';
+        $('mb-julia-params-i').style.display = mp.julia ? '' : 'none';
+        $('mb-julia-r').value = mp.juliaR;
+        setVal('val-mb-jr', mp.juliaR);
+        $('mb-julia-i').value = mp.juliaI;
+        setVal('val-mb-ji', mp.juliaI);
+    }
+
+    $('mb-maxiter').oninput = function () {
+        state.mandelbrotParams.maxIter = parseInt(this.value);
+        setVal('val-mb-maxiter', parseInt(this.value));
+        resetParticles();
+        onStateChange('mandelbrot');
+    };
+
+    $('mb-zoom').oninput = function () {
+        state.mandelbrotParams.zoom = sliderToZoom(parseFloat(this.value));
+        setVal('val-mb-zoom', fmtZoom(state.mandelbrotParams.zoom));
+        resetParticles();
+        onStateChange('mandelbrot');
+    };
+
+    $('mb-center-x').oninput = function () {
+        state.mandelbrotParams.centerX = parseFloat(this.value);
+        setVal('val-mb-cx', state.mandelbrotParams.centerX);
+        resetParticles();
+        onStateChange('mandelbrot');
+    };
+
+    $('mb-center-y').oninput = function () {
+        state.mandelbrotParams.centerY = parseFloat(this.value);
+        setVal('val-mb-cy', state.mandelbrotParams.centerY);
+        resetParticles();
+        onStateChange('mandelbrot');
+    };
+
+    $('mb-julia').onchange = function () {
+        state.mandelbrotParams.julia = this.checked;
+        $('mb-julia-params').style.display = this.checked ? '' : 'none';
+        $('mb-julia-params-i').style.display = this.checked ? '' : 'none';
+        resetParticles();
+        onStateChange('mandelbrot');
+    };
+
+    $('mb-julia-r').oninput = function () {
+        state.mandelbrotParams.juliaR = parseFloat(this.value);
+        setVal('val-mb-jr', state.mandelbrotParams.juliaR);
+        resetParticles();
+        onStateChange('mandelbrot');
+    };
+
+    $('mb-julia-i').oninput = function () {
+        state.mandelbrotParams.juliaI = parseFloat(this.value);
+        setVal('val-mb-ji', state.mandelbrotParams.juliaI);
+        resetParticles();
+        onStateChange('mandelbrot');
+    };
+
+    $('randomize-mandelbrot-btn').onclick = () => {
+        // Random interesting location in the Mandelbrot set boundary
+        const angle = Math.random() * Math.PI * 2;
+        const r = 0.7 + Math.random() * 0.5;
+        state.mandelbrotParams.centerX = r * Math.cos(angle) - 0.5;
+        state.mandelbrotParams.centerY = r * Math.sin(angle);
+        state.mandelbrotParams.zoom = 5 + Math.random() * 200;
+        state.mandelbrotParams.maxIter = 200 + Math.floor(Math.random() * 800);
+        syncMandelbrotSliders();
+        animator.setBase({ maxIter: state.mandelbrotParams.maxIter, zoom: state.mandelbrotParams.zoom, centerX: state.mandelbrotParams.centerX, centerY: state.mandelbrotParams.centerY });
+        resetParticles();
+        onStateChange('mandelbrot');
+        presetsGrid.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    };
+
     // ── Render Mode ─────────────────────────────────────────────────────────────
     $('render-mode').onchange = function () {
         state.renderMode = this.value;
@@ -742,6 +865,7 @@ export function initUI(state, onStateChange, animator) {
             aizawa: AIZAWA_PRESETS[0],
             buddhabrot: BUDDHABROT_PRESETS[0],
             burningship: BURNINGSHIP_PRESETS[0],
+            mandelbrot: MANDELBROT_PRESETS[0],
             curlnoise: CURLNOISE_PRESETS[0],
         };
 
@@ -771,6 +895,11 @@ export function initUI(state, onStateChange, animator) {
             case 'burningship':
                 state.burningShipParams = { ...p };
                 syncBurningShipSliders();
+                animator.setBase({ maxIter: p.maxIter, zoom: p.zoom, centerX: p.centerX, centerY: p.centerY });
+                break;
+            case 'mandelbrot':
+                state.mandelbrotParams = { ...p };
+                syncMandelbrotSliders();
                 animator.setBase({ maxIter: p.maxIter, zoom: p.zoom, centerX: p.centerX, centerY: p.centerY });
                 break;
             case 'curlnoise':
@@ -814,6 +943,6 @@ export function initUI(state, onStateChange, animator) {
     return {
         syncCoeffSliders, syncCliffordSliders, syncLorenzSliders,
         syncAizawaSliders, syncBuddhabrotSliders, syncBurningShipSliders,
-        syncCurlNoiseSliders,
+        syncCurlNoiseSliders, syncMandelbrotSliders,
     };
 }

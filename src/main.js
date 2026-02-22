@@ -6,7 +6,7 @@ import p5 from 'p5';
 import './styles.css';
 import { renderClassic, renderParticles, renderVapor, resetParticles, initClickBurst, renderClickBursts } from './renderer.js';
 import { Animator } from './animator.js';
-import { DEJONG_PRESETS, CLIFFORD_PRESETS, LORENZ_PRESETS, AIZAWA_PRESETS, BUDDHABROT_PRESETS, BURNINGSHIP_PRESETS, CURLNOISE_PRESETS } from './presets.js';
+import { DEJONG_PRESETS, CLIFFORD_PRESETS, LORENZ_PRESETS, AIZAWA_PRESETS, BUDDHABROT_PRESETS, BURNINGSHIP_PRESETS, CURLNOISE_PRESETS, MANDELBROT_PRESETS } from './presets.js';
 import { initUI } from './ui.js';
 import { savePNG, startRecording, stopRecording, isRecording } from './exporter.js';
 import { startAudio, stopAudio, getFrequencyData, getTimeDomainData, isActive as isAudioActive, getSampleRate, getBinCount } from './audio.js';
@@ -43,7 +43,7 @@ import {
 
 const state = {
   seed: 12345,
-  attractorType: 'dejong', // 'dejong' | 'clifford' | 'lorenz' | 'aizawa' | 'buddhabrot' | 'burningship' | 'curlnoise'
+  attractorType: 'dejong', // 'dejong' | 'clifford' | 'lorenz' | 'aizawa' | 'buddhabrot' | 'burningship' | 'mandelbrot' | 'curlnoise'
 
   // De Jong coefficients
   coeffs: { a: DEJONG_PRESETS[0].a, b: DEJONG_PRESETS[0].b, c: DEJONG_PRESETS[0].c, d: DEJONG_PRESETS[0].d },
@@ -65,6 +65,9 @@ const state = {
 
   // Curl Noise parameters
   curlNoiseParams: { ...CURLNOISE_PRESETS[0] },
+
+  // Mandelbrot / Julia parameters
+  mandelbrotParams: { ...MANDELBROT_PRESETS[0] },
 
   renderMode: 'classic', // 'classic' | 'particles' | 'vapor'
 
@@ -160,6 +163,10 @@ function getAnimatorBase(type) {
       const { maxIter, zoom, centerX, centerY } = state.burningShipParams;
       return { maxIter, zoom, centerX, centerY };
     }
+    case 'mandelbrot': {
+      const { maxIter, zoom, centerX, centerY, julia, juliaR, juliaI } = state.mandelbrotParams;
+      return { maxIter, zoom, centerX, centerY, julia, juliaR, juliaI };
+    }
     default: return state.coeffs;
   }
 }
@@ -206,6 +213,12 @@ function applyAnimCoeffs(animCoeffs) {
       Object.keys(animCoeffs).forEach(k => {
         if (k === 'maxIter') state.burningShipParams[k] = Math.round(animCoeffs[k]);
         else state.burningShipParams[k] = animCoeffs[k];
+      });
+      break;
+    case 'mandelbrot':
+      Object.keys(animCoeffs).forEach(k => {
+        if (k === 'maxIter') state.mandelbrotParams[k] = Math.round(animCoeffs[k]);
+        else state.mandelbrotParams[k] = animCoeffs[k];
       });
       break;
     case 'curlnoise':
@@ -435,11 +448,20 @@ const sketch = (p) => {
     renderShaderFX(p5Canvas, state.audioFeatures);
   };
 
-  // Click burst handler
+  // Click burst handler (skip for fractal-explorer types — click zooms instead)
   p.mousePressed = () => {
     const mx = p.mouseX;
     const my = p.mouseY;
     if (mx >= 0 && mx < p.width && my >= 0 && my < p.height) {
+      const isExplorer = ['mandelbrot', 'buddhabrot', 'burningShip'].includes(state.attractorType);
+
+      if (isExplorer) {
+        // ── Click to recenter on cursor position ──
+        _mbDragStart = { x: mx, y: my };
+        _mbDragging = false;
+        return; // don't fire click burst
+      }
+
       initClickBurst(mx, my, p.width, state.colorParams);
 
       // Play position-mapped percussion: hi-hat (top) → rimshot (mid) → kick (bottom)
@@ -460,6 +482,210 @@ const sketch = (p) => {
       }
     }
   };
+
+  // ── Mandelbrot/Julia canvas interactions: scroll-to-zoom + drag-to-pan ──
+  let _mbDragStart = null;
+  let _mbDragging = false;
+
+  /** Get the fractal params object for the active explorer type */
+  function _getExplorerParams() {
+    switch (state.attractorType) {
+      case 'mandelbrot': return state.mandelbrotParams;
+      case 'buddhabrot': return state.buddhabrotParams;
+      case 'burningShip': return state.burningShipParams;
+      default: return null;
+    }
+  }
+
+  /** Convert pixel (px, py) to complex plane coordinates */
+  function _pixelToComplex(px, py, params, w, h) {
+    const aspect = w / h;
+    const scale = 3.0 / params.zoom;
+    const re = params.centerX + (px / w - 0.5) * scale * aspect;
+    const im = params.centerY + (py / h - 0.5) * scale;
+    return { re, im };
+  }
+
+  /** Sync the sidebar sliders for the active explorer type */
+  function _syncExplorerSliders() {
+    if (syncMap.syncMandelbrotSliders && state.attractorType === 'mandelbrot') syncMap.syncMandelbrotSliders();
+    if (syncMap.syncBuddhabrotSliders && state.attractorType === 'buddhabrot') syncMap.syncBuddhabrotSliders();
+    if (syncMap.syncBurningShipSliders && state.attractorType === 'burningShip') syncMap.syncBurningShipSliders();
+  }
+
+  // Scroll-to-zoom on canvas (centered on cursor position)
+  const canvasContainer = document.getElementById('canvas-container');
+  canvasContainer.addEventListener('wheel', (e) => {
+    const params = _getExplorerParams();
+    if (!params) return;
+
+    e.preventDefault();
+
+    const rect = canvasContainer.querySelector('canvas').getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const w = rect.width;
+    const h = rect.height;
+
+    // Point under cursor in complex plane BEFORE zoom
+    const before = _pixelToComplex(mx, my, params, w, h);
+
+    // Zoom factor: scroll up = zoom in, scroll down = zoom out
+    const factor = e.deltaY < 0 ? 1.25 : 0.8;
+    params.zoom = Math.max(0.5, Math.min(100000, params.zoom * factor));
+
+    // Point under cursor AFTER zoom (with same center)
+    const after = _pixelToComplex(mx, my, params, w, h);
+
+    // Shift center so the point under cursor stays fixed
+    params.centerX += before.re - after.re;
+    params.centerY += before.im - after.im;
+
+    _syncExplorerSliders();
+    state.needsRedraw = true;
+  }, { passive: false });
+
+  // Drag-to-pan on canvas
+  canvasContainer.addEventListener('mousemove', (e) => {
+    if (!_mbDragStart) return;
+    const params = _getExplorerParams();
+    if (!params) return;
+
+    const dx = e.movementX;
+    const dy = e.movementY;
+
+    if (!_mbDragging && (Math.abs(e.clientX - _mbDragStart.x) > 3 || Math.abs(e.clientY - _mbDragStart.y) > 3)) {
+      _mbDragging = true;
+    }
+
+    if (_mbDragging) {
+      const rect = canvasContainer.querySelector('canvas').getBoundingClientRect();
+      const aspect = rect.width / rect.height;
+      const scale = 3.0 / params.zoom;
+
+      params.centerX -= (dx / rect.width) * scale * aspect;
+      params.centerY -= (dy / rect.height) * scale;
+
+      _syncExplorerSliders();
+      state.needsRedraw = true;
+    }
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (_mbDragStart && !_mbDragging) {
+      // Short click (no drag) → recenter on clicked point
+      const params = _getExplorerParams();
+      if (params) {
+        const rect = canvasContainer.querySelector('canvas').getBoundingClientRect();
+        const mx = _mbDragStart.x;
+        const my = _mbDragStart.y;
+        const pt = _pixelToComplex(mx, my, params, rect.width, rect.height);
+        params.centerX = pt.re;
+        params.centerY = pt.im;
+        params.zoom *= 2; // Click also zooms in 2x
+        params.zoom = Math.min(100000, params.zoom);
+        _syncExplorerSliders();
+        state.needsRedraw = true;
+      }
+    }
+    _mbDragStart = null;
+    _mbDragging = false;
+  });
+
+  // ── Touch interactions: pinch-to-zoom + drag-to-pan ──
+  let _touchStartDist = 0;
+  let _touchStartZoom = 1;
+  let _touchStartMid = null;
+  let _touchStartCenter = null;
+  let _singleTouchStart = null;
+
+  canvasContainer.addEventListener('touchstart', (e) => {
+    const params = _getExplorerParams();
+    if (!params) return;
+    e.preventDefault();
+
+    if (e.touches.length === 2) {
+      // Pinch-to-zoom start
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      _touchStartDist = Math.hypot(dx, dy);
+      _touchStartZoom = params.zoom;
+      _touchStartMid = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
+      _touchStartCenter = { x: params.centerX, y: params.centerY };
+      _singleTouchStart = null;
+    } else if (e.touches.length === 1) {
+      // Single-finger drag-to-pan start
+      _singleTouchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  }, { passive: false });
+
+  canvasContainer.addEventListener('touchmove', (e) => {
+    const params = _getExplorerParams();
+    if (!params) return;
+    e.preventDefault();
+
+    const rect = canvasContainer.querySelector('canvas').getBoundingClientRect();
+
+    if (e.touches.length === 2 && _touchStartDist > 0) {
+      // Pinch-to-zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const scaleFactor = dist / _touchStartDist;
+
+      // Compute midpoint in local canvas coords
+      const midX = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
+      const midY = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
+
+      // Point under midpoint BEFORE zoom (use start center/zoom)
+      const aspect = rect.width / rect.height;
+      const scaleBefore = 3.0 / _touchStartZoom;
+      const reBefore = _touchStartCenter.x + (midX / rect.width - 0.5) * scaleBefore * aspect;
+      const imBefore = _touchStartCenter.y + (midY / rect.height - 0.5) * scaleBefore;
+
+      // New zoom
+      params.zoom = Math.max(0.5, Math.min(100000, _touchStartZoom * scaleFactor));
+
+      // Point under midpoint AFTER zoom
+      const scaleAfter = 3.0 / params.zoom;
+      const reAfter = _touchStartCenter.x + (midX / rect.width - 0.5) * scaleAfter * aspect;
+      const imAfter = _touchStartCenter.y + (midY / rect.height - 0.5) * scaleAfter;
+
+      // Shift center so midpoint stays fixed
+      params.centerX = _touchStartCenter.x + (reBefore - reAfter);
+      params.centerY = _touchStartCenter.y + (imBefore - imAfter);
+
+      _syncExplorerSliders();
+      state.needsRedraw = true;
+    } else if (e.touches.length === 1 && _singleTouchStart) {
+      // Single-finger drag-to-pan
+      const dx = e.touches[0].clientX - _singleTouchStart.x;
+      const dy = e.touches[0].clientY - _singleTouchStart.y;
+      _singleTouchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+
+      const aspect = rect.width / rect.height;
+      const scale = 3.0 / params.zoom;
+      params.centerX -= (dx / rect.width) * scale * aspect;
+      params.centerY -= (dy / rect.height) * scale;
+
+      _syncExplorerSliders();
+      state.needsRedraw = true;
+    }
+  }, { passive: false });
+
+  canvasContainer.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) {
+      _touchStartDist = 0;
+      _touchStartMid = null;
+      _touchStartCenter = null;
+    }
+    if (e.touches.length === 0) {
+      _singleTouchStart = null;
+    }
+  });
 
   // Resize handling
   p.windowResized = () => {
@@ -955,6 +1181,7 @@ setTimeout(() => {
         document.getElementById('midi-effects-drawer').style.display = '';
         document.getElementById('drum-effects-drawer').style.display = '';
         document.getElementById('bass-effects-drawer').style.display = '';
+        document.getElementById('vfx-drawer').style.display = '';
         document.getElementById('voice-mode-bar').style.display = '';
 
         // Init bass synth with MIDI's audio context
@@ -996,6 +1223,7 @@ setTimeout(() => {
       document.getElementById('midi-effects-drawer').style.display = 'none';
       document.getElementById('drum-effects-drawer').style.display = 'none';
       document.getElementById('bass-effects-drawer').style.display = 'none';
+      document.getElementById('vfx-drawer').style.display = 'none';
       document.getElementById('voice-mode-bar').style.display = 'none';
       destroyBass();
       // Reset drawer state
@@ -1477,6 +1705,14 @@ setTimeout(() => {
   bassDrawerToggle.onclick = () => {
     bassDrawerContent.classList.toggle('open');
     bassDrawerToggle.classList.toggle('open');
+  };
+
+  // ── Visual FX Drawer ────────────────────────────────────────────────────
+  const vfxDrawerToggle = document.getElementById('vfx-drawer-toggle');
+  const vfxDrawerContent = document.getElementById('vfx-drawer-content');
+  vfxDrawerToggle.onclick = () => {
+    vfxDrawerContent.classList.toggle('open');
+    vfxDrawerToggle.classList.toggle('open');
   };
 
   // Bass controls
