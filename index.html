@@ -22,6 +22,343 @@
       <div id="canvas-stage">
         <div id="canvas-container"></div>
         <canvas id="midi-keyboard-viz" style="display:none;"></canvas>
+        <div id="voice-mode-bar" style="display:none;">
+          <span class="voice-mode-label">Voice</span>
+          <label class="voice-mode-opt"><input type="radio" name="voice-mode" value="synth" /><span>Synth</span></label>
+          <label class="voice-mode-opt"><input type="radio" name="voice-mode" value="bass" /><span>Bass</span></label>
+          <label class="voice-mode-opt"><input type="radio" name="voice-mode" value="both"
+              checked /><span>Both</span></label>
+        </div>
+        <canvas id="guitar-fretboard-viz" style="display:none;"></canvas>
+
+        <!-- Guitar Pedalboard Drawer -->
+        <div id="guitar-effects-drawer" style="display:none;">
+          <button id="guitar-drawer-toggle" class="midi-drawer-handle guitar-drawer-handle"
+            aria-label="Toggle guitar pedalboard">
+            <span class="midi-drawer-handle-bar"></span>
+            <span class="drawer-label">🎸 PEDALBOARD</span>
+            <span class="midi-drawer-handle-bar"></span>
+          </button>
+          <div id="guitar-drawer-content" class="midi-drawer-content">
+
+            <!-- Controls Row -->
+            <div class="guitar-controls-row">
+              <div class="midi-fx-control">
+                <label for="guitar-tuning">Tuning</label>
+                <select id="guitar-tuning">
+                  <option value="standard" selected>Standard</option>
+                  <option value="dropD">Drop D</option>
+                  <option value="openG">Open G</option>
+                  <option value="dadgad">DADGAD</option>
+                </select>
+              </div>
+              <div class="midi-fx-control">
+                <label for="guitar-chord">Chord</label>
+                <select id="guitar-chord">
+                  <option value="None">None (Open)</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                  <option value="E">E</option>
+                  <option value="F">F</option>
+                  <option value="G">G</option>
+                  <option value="A">A</option>
+                  <option value="Am">Am</option>
+                  <option value="Bm">Bm</option>
+                  <option value="Dm">Dm</option>
+                  <option value="Em">Em</option>
+                  <option value="A7">A7</option>
+                  <option value="D7">D7</option>
+                </select>
+              </div>
+              <div class="guitar-strum-controls">
+                <button id="guitar-strum-down" class="midi-looper-btn guitar-strum-btn" title="Strum Down">↓
+                  Strum</button>
+                <button id="guitar-strum-up" class="midi-looper-btn guitar-strum-btn" title="Strum Up">↑ Strum</button>
+              </div>
+              <div class="midi-fx-control">
+                <label for="guitar-riff">Riff</label>
+                <select id="guitar-riff">
+                  <option value="none">None</option>
+                  <option value="blues_shuffle">Blues Shuffle</option>
+                  <option value="smoke_water">Smoke on the Water</option>
+                  <option value="sunshine">Sunshine of Your Love</option>
+                  <option value="fingerpick_em">Em Fingerpick</option>
+                  <option value="power_chord">Power Chord Punk</option>
+                  <option value="spanish">Spanish Romance</option>
+                  <option value="redemption">Reggae Skank</option>
+                  <option value="walking_bass">Walking Bass</option>
+                </select>
+              </div>
+              <div class="guitar-strum-controls">
+                <button id="guitar-riff-play" class="midi-looper-btn guitar-strum-btn" title="Play Riff">▶ Play</button>
+                <button id="guitar-riff-stop" class="midi-looper-btn guitar-strum-btn" title="Stop Riff" disabled>⏹
+                  Stop</button>
+              </div>
+              <div class="midi-fx-control">
+                <label for="guitar-volume">Vol <span class="fx-val" id="guitar-vol-val">0.60</span></label>
+                <input type="range" id="guitar-volume" min="0" max="1" step="0.01" value="0.6" />
+              </div>
+            </div>
+
+            <!-- Pedals Row -->
+            <div class="guitar-pedals-row">
+
+              <!-- Overdrive -->
+              <div class="guitar-pedal" data-pedal="overdrive">
+                <div class="pedal-header">
+                  <span class="pedal-led on" id="pedal-led-overdrive"></span>
+                  <span class="pedal-name">🔥 Overdrive</span>
+                </div>
+                <label class="pedal-toggle">
+                  <input type="checkbox" id="pedal-toggle-overdrive" checked />
+                  <span class="pedal-switch"></span>
+                </label>
+                <div class="pedal-knobs">
+                  <div class="pedal-knob">
+                    <label>Drive <span class="fx-val" id="pedal-val-overdrive-drive">2.0</span></label>
+                    <input type="range" id="pedal-overdrive-drive" min="0.5" max="8" step="0.1" value="2.0" />
+                  </div>
+                  <div class="pedal-knob">
+                    <label>Tone <span class="fx-val" id="pedal-val-overdrive-tone">3000</span></label>
+                    <input type="range" id="pedal-overdrive-tone" min="500" max="8000" step="50" value="3000" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Chorus -->
+              <div class="guitar-pedal" data-pedal="chorus">
+                <div class="pedal-header">
+                  <span class="pedal-led" id="pedal-led-chorus"></span>
+                  <span class="pedal-name">🌊 Chorus</span>
+                </div>
+                <label class="pedal-toggle">
+                  <input type="checkbox" id="pedal-toggle-chorus" />
+                  <span class="pedal-switch"></span>
+                </label>
+                <div class="pedal-knobs">
+                  <div class="pedal-knob">
+                    <label>Rate <span class="fx-val" id="pedal-val-chorus-rate">1.5</span></label>
+                    <input type="range" id="pedal-chorus-rate" min="0.1" max="5" step="0.1" value="1.5" />
+                  </div>
+                  <div class="pedal-knob">
+                    <label>Depth <span class="fx-val" id="pedal-val-chorus-depth">0.004</span></label>
+                    <input type="range" id="pedal-chorus-depth" min="0.001" max="0.01" step="0.001" value="0.004" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Phaser -->
+              <div class="guitar-pedal" data-pedal="phaser">
+                <div class="pedal-header">
+                  <span class="pedal-led" id="pedal-led-phaser"></span>
+                  <span class="pedal-name">🌀 Phaser</span>
+                </div>
+                <label class="pedal-toggle">
+                  <input type="checkbox" id="pedal-toggle-phaser" />
+                  <span class="pedal-switch"></span>
+                </label>
+                <div class="pedal-knobs">
+                  <div class="pedal-knob">
+                    <label>Rate <span class="fx-val" id="pedal-val-phaser-rate">0.5</span></label>
+                    <input type="range" id="pedal-phaser-rate" min="0.1" max="5" step="0.1" value="0.5" />
+                  </div>
+                  <div class="pedal-knob">
+                    <label>Depth <span class="fx-val" id="pedal-val-phaser-depth">1500</span></label>
+                    <input type="range" id="pedal-phaser-depth" min="200" max="5000" step="100" value="1500" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Delay -->
+              <div class="guitar-pedal" data-pedal="delay">
+                <div class="pedal-header">
+                  <span class="pedal-led" id="pedal-led-delay"></span>
+                  <span class="pedal-name">⏱ Delay</span>
+                </div>
+                <label class="pedal-toggle">
+                  <input type="checkbox" id="pedal-toggle-delay" />
+                  <span class="pedal-switch"></span>
+                </label>
+                <div class="pedal-knobs">
+                  <div class="pedal-knob">
+                    <label>Time <span class="fx-val" id="pedal-val-delay-time">0.35</span></label>
+                    <input type="range" id="pedal-delay-time" min="0.05" max="1.5" step="0.01" value="0.35" />
+                  </div>
+                  <div class="pedal-knob">
+                    <label>Fdbk <span class="fx-val" id="pedal-val-delay-feedback">0.40</span></label>
+                    <input type="range" id="pedal-delay-feedback" min="0" max="0.9" step="0.01" value="0.4" />
+                  </div>
+                  <div class="pedal-knob">
+                    <label>Mix <span class="fx-val" id="pedal-val-delay-mix">0.30</span></label>
+                    <input type="range" id="pedal-delay-mix" min="0" max="1" step="0.01" value="0.3" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Reverb -->
+              <div class="guitar-pedal" data-pedal="reverb">
+                <div class="pedal-header">
+                  <span class="pedal-led" id="pedal-led-reverb"></span>
+                  <span class="pedal-name">🏛 Reverb</span>
+                </div>
+                <label class="pedal-toggle">
+                  <input type="checkbox" id="pedal-toggle-reverb" />
+                  <span class="pedal-switch"></span>
+                </label>
+                <div class="pedal-knobs">
+                  <div class="pedal-knob">
+                    <label>Decay <span class="fx-val" id="pedal-val-reverb-decay">2.0</span></label>
+                    <input type="range" id="pedal-reverb-decay" min="0.3" max="6" step="0.1" value="2.0" />
+                  </div>
+                  <div class="pedal-knob">
+                    <label>Mix <span class="fx-val" id="pedal-val-reverb-mix">0.30</span></label>
+                    <input type="range" id="pedal-reverb-mix" min="0" max="1" step="0.01" value="0.3" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tremolo -->
+              <div class="guitar-pedal" data-pedal="tremolo">
+                <div class="pedal-header">
+                  <span class="pedal-led" id="pedal-led-tremolo"></span>
+                  <span class="pedal-name">〰 Tremolo</span>
+                </div>
+                <label class="pedal-toggle">
+                  <input type="checkbox" id="pedal-toggle-tremolo" />
+                  <span class="pedal-switch"></span>
+                </label>
+                <div class="pedal-knobs">
+                  <div class="pedal-knob">
+                    <label>Rate <span class="fx-val" id="pedal-val-tremolo-rate">5.0</span></label>
+                    <input type="range" id="pedal-tremolo-rate" min="0.5" max="15" step="0.1" value="5.0" />
+                  </div>
+                  <div class="pedal-knob">
+                    <label>Depth <span class="fx-val" id="pedal-val-tremolo-depth">0.60</span></label>
+                    <input type="range" id="pedal-tremolo-depth" min="0" max="1" step="0.01" value="0.6" />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Drum Machine Drawer -->
+        <div id="drum-effects-drawer" style="display:none;">
+          <button id="drum-drawer-toggle" class="midi-drawer-handle drum-drawer-handle"
+            aria-label="Toggle drum machine">
+            <span class="midi-drawer-handle-bar"></span>
+            <span class="drawer-label">🥁 DRUM MACHINE</span>
+            <span class="midi-drawer-handle-bar"></span>
+          </button>
+          <div id="drum-drawer-content" class="midi-drawer-content">
+
+            <!-- Controls Row -->
+            <div class="drum-controls-top">
+              <div class="drum-transport">
+                <button id="drum-play" class="midi-looper-btn drum-play-btn" title="Play">▶</button>
+                <button id="drum-stop" class="midi-looper-btn drum-stop-btn" title="Stop" disabled>⏹</button>
+                <button id="drum-clear" class="midi-looper-btn drum-clear-btn" title="Clear">✕</button>
+              </div>
+              <div class="midi-fx-control">
+                <label for="drum-bpm">Tempo <span class="fx-val" id="drum-bpm-val">120</span></label>
+                <input type="range" id="drum-bpm" min="40" max="240" step="1" value="120" />
+              </div>
+              <div class="midi-fx-control">
+                <label for="drum-volume">Vol <span class="fx-val" id="drum-vol-val">0.70</span></label>
+                <input type="range" id="drum-volume" min="0" max="1" step="0.01" value="0.7" />
+              </div>
+              <div class="midi-fx-control">
+                <label for="drum-swing">Swing <span class="fx-val" id="drum-swing-val">0%</span></label>
+                <input type="range" id="drum-swing" min="0" max="1" step="0.01" value="0" />
+              </div>
+              <div class="midi-fx-control">
+                <label for="drum-preset">Preset</label>
+                <select id="drum-preset">
+                  <option value="">— Custom —</option>
+                  <option value="rock">Rock</option>
+                  <option value="funk">Funk</option>
+                  <option value="bossa">Bossa Nova</option>
+                  <option value="trap">Trap</option>
+                  <option value="breakbeat">Breakbeat</option>
+                  <option value="eightOhEight">808</option>
+                </select>
+              </div>
+              <div class="drum-step-toggle">
+                <button id="drum-steps-16" class="midi-looper-btn drum-step-btn active" title="16 Steps">16</button>
+                <button id="drum-steps-32" class="midi-looper-btn drum-step-btn" title="32 Steps">32</button>
+              </div>
+            </div>
+
+            <!-- Step Sequencer Grid (built dynamically in JS) -->
+            <div class="drum-grid" id="drum-grid"></div>
+
+          </div>
+        </div>
+        <!-- Bass Synth Drawer -->
+        <div id="bass-effects-drawer" style="display:none;">
+          <button id="bass-drawer-toggle" class="midi-drawer-handle drum-drawer-handle" aria-label="Toggle bass synth">
+            <span class="midi-drawer-handle-bar"></span>
+            <span class="drawer-label">🎛️ BASS SYNTH</span>
+            <span class="midi-drawer-handle-bar"></span>
+          </button>
+          <div id="bass-drawer-content" class="midi-drawer-content">
+            <div class="drum-controls-top bass-controls">
+              <div class="midi-fx-control">
+                <label for="bass-wave">Wave</label>
+                <select id="bass-wave">
+                  <option value="sawtooth">Saw</option>
+                  <option value="square">Square</option>
+                  <option value="triangle">Tri</option>
+                </select>
+              </div>
+              <div class="midi-fx-control">
+                <label for="bass-sub-wave">Sub</label>
+                <select id="bass-sub-wave">
+                  <option value="square" selected>Square</option>
+                  <option value="sine">Sine</option>
+                  <option value="sawtooth">Saw</option>
+                </select>
+              </div>
+              <div class="midi-fx-control">
+                <label for="bass-sub-level">Sub Lvl <span class="fx-val" id="bass-sub-level-val">0.50</span></label>
+                <input type="range" id="bass-sub-level" min="0" max="1" step="0.01" value="0.5" />
+              </div>
+              <div class="midi-fx-control">
+                <label for="bass-cutoff">Cutoff <span class="fx-val" id="bass-cutoff-val">1200</span></label>
+                <input type="range" id="bass-cutoff" min="20" max="8000" step="10" value="1200" />
+              </div>
+              <div class="midi-fx-control">
+                <label for="bass-reso">Reso <span class="fx-val" id="bass-reso-val">8.0</span></label>
+                <input type="range" id="bass-reso" min="0" max="25" step="0.5" value="8" />
+              </div>
+              <div class="midi-fx-control">
+                <label for="bass-env-amt">Env Amt <span class="fx-val" id="bass-env-amt-val">3000</span></label>
+                <input type="range" id="bass-env-amt" min="0" max="10000" step="50" value="3000" />
+              </div>
+              <div class="midi-fx-control">
+                <label for="bass-env-decay">Env Dec <span class="fx-val" id="bass-env-decay-val">0.25</span></label>
+                <input type="range" id="bass-env-decay" min="0.01" max="2" step="0.01" value="0.25" />
+              </div>
+              <div class="midi-fx-control">
+                <label for="bass-glide">Glide <span class="fx-val" id="bass-glide-val">0.06</span></label>
+                <input type="range" id="bass-glide" min="0" max="0.5" step="0.01" value="0.06" />
+              </div>
+              <div class="midi-fx-control">
+                <label for="bass-octave">Octave <span class="fx-val" id="bass-octave-val">0</span></label>
+                <input type="range" id="bass-octave" min="-2" max="2" step="1" value="0" />
+              </div>
+              <div class="midi-fx-control">
+                <label for="bass-volume">Volume <span class="fx-val" id="bass-volume-val">0.70</span></label>
+                <input type="range" id="bass-volume" min="0" max="1" step="0.01" value="0.7" />
+              </div>
+              <div class="midi-fx-control bass-accent-ctrl">
+                <label for="bass-accent">Accent</label>
+                <input type="checkbox" id="bass-accent" />
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- MIDI Effects Drawer -->
         <div id="midi-effects-drawer" style="display:none;">
@@ -36,6 +373,12 @@
               <!-- Waveform & Octave -->
               <div class="midi-fx-group">
                 <div class="midi-fx-title">Synth</div>
+                <div class="midi-fx-control">
+                  <label for="fx-synth-preset">Preset</label>
+                  <select id="fx-synth-preset">
+                    <option value="">— Custom —</option>
+                  </select>
+                </div>
                 <div class="midi-fx-control">
                   <label for="fx-waveform">Wave</label>
                   <select id="fx-waveform">
@@ -279,44 +622,6 @@
                   <button id="fx-looper-stop" class="midi-looper-btn midi-looper-stop" title="Clear" disabled>⏹</button>
                 </div>
                 <div class="midi-looper-status" id="fx-looper-status">Idle</div>
-              </div>
-
-              <div class="midi-fx-divider"></div>
-
-              <!-- Drum Machine -->
-              <div class="midi-fx-group midi-fx-drums">
-                <div class="midi-fx-title">Drums</div>
-                <div class="drum-controls-row">
-                  <button id="drum-play" class="midi-looper-btn drum-play-btn" title="Play">▶</button>
-                  <button id="drum-stop" class="midi-looper-btn drum-stop-btn" title="Stop" disabled>⏹</button>
-                  <button id="drum-clear" class="midi-looper-btn drum-clear-btn" title="Clear">✕</button>
-                </div>
-                <div class="midi-fx-control">
-                  <label for="drum-bpm">BPM <span class="fx-val" id="drum-bpm-val">120</span></label>
-                  <input type="range" id="drum-bpm" min="40" max="240" step="1" value="120" />
-                </div>
-                <div class="midi-fx-control">
-                  <label for="drum-volume">Vol <span class="fx-val" id="drum-vol-val">0.70</span></label>
-                  <input type="range" id="drum-volume" min="0" max="1" step="0.01" value="0.7" />
-                </div>
-                <div class="drum-grid" id="drum-grid">
-                  <div class="drum-row" data-track="0">
-                    <span class="drum-label">Kick</span>
-                    <div class="drum-steps"></div>
-                  </div>
-                  <div class="drum-row" data-track="1">
-                    <span class="drum-label">Snare</span>
-                    <div class="drum-steps"></div>
-                  </div>
-                  <div class="drum-row" data-track="2">
-                    <span class="drum-label">HiHat</span>
-                    <div class="drum-steps"></div>
-                  </div>
-                  <div class="drum-row" data-track="3">
-                    <span class="drum-label">Clap</span>
-                    <div class="drum-steps"></div>
-                  </div>
-                </div>
               </div>
 
               <div class="midi-fx-divider"></div>
@@ -831,6 +1136,17 @@
             </div>
             <div class="control-group">
               <label>Device <span class="value-display" id="midi-device-name">—</span></label>
+            </div>
+          </div>
+
+          <!-- Guitar Simulator -->
+          <div class="control-group guitar-section"
+            style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);">
+            <label for="guitar-toggle">🎸 Guitar</label>
+            <div class="midi-toggle-row">
+              <input type="checkbox" id="guitar-toggle" />
+              <span class="midi-status-dot" id="guitar-status-dot"></span>
+              <span class="midi-status-text" id="guitar-status-text">Off</span>
             </div>
           </div>
         </section>

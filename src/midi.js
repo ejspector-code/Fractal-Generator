@@ -41,6 +41,7 @@ let reverbConvolver = null;
 let reverbDryGain = null;
 let reverbWetGain = null;
 let audioStreamDest = null;
+let synthOutputGain = null; // synth-only bus (before drums merge into master)
 
 // Looper state
 let looperRecorder = null;
@@ -51,6 +52,10 @@ let looperIsPlaying = false;
 let looperGain = null;
 let looperRecordingChunks = [];
 let looperStream = null;
+
+// Global tempo
+let globalBPM = 120;
+let onTempoChangeCallback = null;
 
 // Effect parameters
 let effectParams = {
@@ -114,7 +119,7 @@ function expandChord(note) {
 }
 
 // ── Arpeggiator ───────────────────────────────────────────────────────────────
-let arp = { enabled: false, pattern: 'up', rate: '1/8', bpm: 120, octaves: 1 };
+let arp = { enabled: false, pattern: 'up', rate: '1/8', octaves: 1 };
 let arpHeldNotes = [];      // notes currently held (after scale + chord)
 let arpTimer = null;
 let arpIndex = 0;
@@ -137,7 +142,7 @@ function getArpSequence() {
 }
 
 function arpRateMs() {
-    const beatMs = 60000 / arp.bpm;
+    const beatMs = 60000 / globalBPM;
     switch (arp.rate) {
         case '1/4': return beatMs;
         case '1/8': return beatMs / 2;
@@ -590,8 +595,11 @@ export async function startMidi() {
         delayMerge.connect(reverbDryGain);
         reverbDryGain.connect(reverbMerge);
 
-        // reverbMerge → masterGain → analyser → destination
-        reverbMerge.connect(masterGain);
+        // reverbMerge → synthOutputGain (synth-only bus) → masterGain
+        synthOutputGain = audioCtx.createGain();
+        synthOutputGain.gain.setValueAtTime(1, audioCtx.currentTime);
+        reverbMerge.connect(synthOutputGain);
+        synthOutputGain.connect(masterGain);
         looperGain.connect(masterGain);
         masterGain.connect(analyser);
         analyser.connect(audioCtx.destination);
@@ -850,11 +858,13 @@ export function setArpRate(rate) {
 }
 
 export function setArpBPM(bpm) {
-    arp.bpm = bpm;
+    globalBPM = Math.max(40, Math.min(240, bpm));
+    drumBPM = globalBPM;
     if (arp.enabled && arpTimer) {
         clearInterval(arpTimer);
         arpTimer = setInterval(arpTick, arpRateMs());
     }
+    if (onTempoChangeCallback) onTempoChangeCallback(globalBPM);
 }
 
 export function setArpOctaves(n) {
@@ -870,9 +880,9 @@ export function getAudioStream() {
 export function startLooperRecording() {
     if (!audioCtx || !masterGain || looperIsRecording) return;
 
-    // Create a MediaStream from the master output
+    // Record from synthOutputGain (synth-only, excludes drums)
     const dest = audioCtx.createMediaStreamDestination();
-    masterGain.connect(dest);
+    synthOutputGain.connect(dest);
     looperStream = dest;
 
     looperRecordingChunks = [];
@@ -908,7 +918,7 @@ export function stopLooperRecording() {
 
     // Disconnect the media stream dest
     try {
-        if (looperStream) masterGain.disconnect(looperStream);
+        if (looperStream) synthOutputGain.disconnect(looperStream);
     } catch (e) { }
     looperStream = null;
 }
@@ -1019,25 +1029,38 @@ export function setNoteCallback(cb) {
 }
 
 export function getEffectParams() {
-    return effectParams;
+    return { waveform, ...effectParams };
 }
+
+export function getMidiAudioContext() { return audioCtx; }
+export function getMidiMasterGain() { return masterGain; }
 
 // ── Drum Machine ──────────────────────────────────────────────────────────────
 
-const DRUM_TRACKS = ['kick', 'snare', 'hihat', 'clap'];
-const DRUM_STEPS = 16;
+const DRUM_TRACKS = ['kick', 'snare', 'hihat', 'clap', 'tom', 'rim', 'cowbell', 'openhh'];
+let DRUM_STEPS = 16;
 
 let drumPattern = DRUM_TRACKS.map(() => new Array(DRUM_STEPS).fill(false));
 let drumBPM = 120;
 let drumVolume = 0.7;
+let drumSwing = 0;
 let drumPlaying = false;
 let drumTimerID = null;
 let drumCurrentStep = 0;
 let drumGain = null;
 let drumNextStepTime = 0;
-let drumLookahead = 25; // ms
-let drumScheduleAhead = 0.1; // seconds
+let drumLookahead = 25;
+let drumScheduleAhead = 0.1;
 let onDrumStepCallback = null;
+
+let drumMute = new Array(DRUM_TRACKS.length).fill(false);
+let drumSolo = new Array(DRUM_TRACKS.length).fill(false);
+
+function isTrackAudible(trackIndex) {
+    const anySolo = drumSolo.some(s => s);
+    if (anySolo) return drumSolo[trackIndex] && !drumMute[trackIndex];
+    return !drumMute[trackIndex];
+}
 
 // ── Drum Synthesis ────────────────────────────────────────────────────────────
 
@@ -1047,56 +1070,37 @@ function playKick(time) {
     const gain = audioCtx.createGain();
     const click = audioCtx.createOscillator();
     const clickGain = audioCtx.createGain();
-
-    // Body — sine sweep from 150Hz down to 40Hz
     osc.type = 'sine';
     osc.frequency.setValueAtTime(150, time);
     osc.frequency.exponentialRampToValueAtTime(40, time + 0.12);
     gain.gain.setValueAtTime(1.0, time);
     gain.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
-
-    // Click transient
     click.type = 'square';
     click.frequency.setValueAtTime(800, time);
     click.frequency.exponentialRampToValueAtTime(100, time + 0.02);
     clickGain.gain.setValueAtTime(0.6, time);
     clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
-
-    osc.connect(gain);
-    gain.connect(drumGain);
-    click.connect(clickGain);
-    clickGain.connect(drumGain);
-
-    osc.start(time);
-    osc.stop(time + 0.45);
-    click.start(time);
-    click.stop(time + 0.04);
+    osc.connect(gain); gain.connect(drumGain);
+    click.connect(clickGain); clickGain.connect(drumGain);
+    osc.start(time); osc.stop(time + 0.45);
+    click.start(time); click.stop(time + 0.04);
 }
 
 function playSnare(time) {
     if (!audioCtx || !drumGain) return;
-
-    // Noise burst
     const noiseLen = audioCtx.sampleRate * 0.15;
     const noiseBuf = audioCtx.createBuffer(1, noiseLen, audioCtx.sampleRate);
     const data = noiseBuf.getChannelData(0);
     for (let i = 0; i < noiseLen; i++) data[i] = Math.random() * 2 - 1;
-
     const noise = audioCtx.createBufferSource();
     noise.buffer = noiseBuf;
     const noiseGain = audioCtx.createGain();
     noiseGain.gain.setValueAtTime(0.8, time);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
-
     const noiseFilter = audioCtx.createBiquadFilter();
     noiseFilter.type = 'highpass';
     noiseFilter.frequency.setValueAtTime(1000, time);
-
-    noise.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(drumGain);
-
-    // Tone body
+    noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(drumGain);
     const osc = audioCtx.createOscillator();
     const oscGain = audioCtx.createGain();
     osc.type = 'triangle';
@@ -1104,100 +1108,221 @@ function playSnare(time) {
     osc.frequency.exponentialRampToValueAtTime(80, time + 0.07);
     oscGain.gain.setValueAtTime(0.5, time);
     oscGain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
-
-    osc.connect(oscGain);
-    oscGain.connect(drumGain);
-
-    noise.start(time);
-    noise.stop(time + 0.15);
-    osc.start(time);
-    osc.stop(time + 0.12);
+    osc.connect(oscGain); oscGain.connect(drumGain);
+    noise.start(time); noise.stop(time + 0.15);
+    osc.start(time); osc.stop(time + 0.12);
 }
 
 function playHiHat(time) {
     if (!audioCtx || !drumGain) return;
-
-    // Metallic noise
-    const noiseLen = audioCtx.sampleRate * 0.08;
-    const noiseBuf = audioCtx.createBuffer(1, noiseLen, audioCtx.sampleRate);
-    const data = noiseBuf.getChannelData(0);
-    for (let i = 0; i < noiseLen; i++) data[i] = Math.random() * 2 - 1;
-
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = noiseBuf;
-
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.setValueAtTime(7000, time);
-
-    const gain = audioCtx.createGain();
-    gain.gain.setValueAtTime(0.4, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(drumGain);
-
-    noise.start(time);
-    noise.stop(time + 0.08);
+    const fundamental = 40;
+    const ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
+    for (const ratio of ratios) {
+        const osc = audioCtx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(fundamental * ratio, time);
+        const bp = audioCtx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.frequency.setValueAtTime(10000, time); bp.Q.setValueAtTime(1, time);
+        const hp = audioCtx.createBiquadFilter();
+        hp.type = 'highpass'; hp.frequency.setValueAtTime(7000, time);
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.3, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+        osc.connect(bp); bp.connect(hp); hp.connect(gain); gain.connect(drumGain);
+        osc.start(time); osc.stop(time + 0.06);
+    }
 }
 
 function playClap(time) {
     if (!audioCtx || !drumGain) return;
-
-    // Layered noise bursts for clap texture
-    for (let b = 0; b < 3; b++) {
-        const offset = b * 0.012;
-        const noiseLen = audioCtx.sampleRate * 0.1;
+    for (let offset = 0; offset < 3; offset++) {
+        const noiseLen = audioCtx.sampleRate * 0.02;
         const noiseBuf = audioCtx.createBuffer(1, noiseLen, audioCtx.sampleRate);
-        const data = noiseBuf.getChannelData(0);
-        for (let i = 0; i < noiseLen; i++) data[i] = Math.random() * 2 - 1;
-
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < noiseLen; i++) d[i] = Math.random() * 2 - 1;
         const noise = audioCtx.createBufferSource();
         noise.buffer = noiseBuf;
-
         const filter = audioCtx.createBiquadFilter();
         filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(2000, time + offset);
-        filter.Q.setValueAtTime(2, time + offset);
-
+        filter.frequency.setValueAtTime(2000, time + offset * 0.01);
+        filter.Q.setValueAtTime(2, time + offset * 0.01);
         const gain = audioCtx.createGain();
-        gain.gain.setValueAtTime(0.6, time + offset);
-        gain.gain.exponentialRampToValueAtTime(0.001, time + offset + 0.09);
-
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(drumGain);
-
-        noise.start(time + offset);
-        noise.stop(time + offset + 0.1);
+        gain.gain.setValueAtTime(0.6, time + offset * 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + offset * 0.01 + 0.09);
+        noise.connect(filter); filter.connect(gain); gain.connect(drumGain);
+        noise.start(time + offset * 0.01); noise.stop(time + offset * 0.01 + 0.1);
     }
 }
 
-const drumSynths = { kick: playKick, snare: playSnare, hihat: playHiHat, clap: playClap };
+function playTom(time) {
+    if (!audioCtx || !drumGain) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(200, time);
+    osc.frequency.exponentialRampToValueAtTime(80, time + 0.2);
+    gain.gain.setValueAtTime(0.8, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+    osc.connect(gain); gain.connect(drumGain);
+    osc.start(time); osc.stop(time + 0.4);
+}
+
+function playRim(time) {
+    if (!audioCtx || !drumGain) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(800, time);
+    gain.gain.setValueAtTime(0.6, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+    osc.connect(gain); gain.connect(drumGain);
+    osc.start(time); osc.stop(time + 0.05);
+}
+
+function playCowbell(time) {
+    if (!audioCtx || !drumGain) return;
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const bp = audioCtx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.setValueAtTime(800, time); bp.Q.setValueAtTime(3, time);
+    osc1.type = 'square'; osc1.frequency.setValueAtTime(800, time);
+    osc2.type = 'square'; osc2.frequency.setValueAtTime(540, time);
+    gain.gain.setValueAtTime(0.5, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+    osc1.connect(bp); osc2.connect(bp); bp.connect(gain); gain.connect(drumGain);
+    osc1.start(time); osc1.stop(time + 0.35);
+    osc2.start(time); osc2.stop(time + 0.35);
+}
+
+function playOpenHH(time) {
+    if (!audioCtx || !drumGain) return;
+    const fundamental = 40;
+    const ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
+    for (const ratio of ratios) {
+        const osc = audioCtx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(fundamental * ratio, time);
+        const bp = audioCtx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.frequency.setValueAtTime(10000, time); bp.Q.setValueAtTime(1, time);
+        const hp = audioCtx.createBiquadFilter();
+        hp.type = 'highpass'; hp.frequency.setValueAtTime(7000, time);
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.25, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
+        osc.connect(bp); bp.connect(hp); hp.connect(gain); gain.connect(drumGain);
+        osc.start(time); osc.stop(time + 0.3);
+    }
+}
+
+const drumSynths = {
+    kick: playKick, snare: playSnare, hihat: playHiHat, clap: playClap,
+    tom: playTom, rim: playRim, cowbell: playCowbell, openhh: playOpenHH,
+};
+
+// ── Pattern Presets ───────────────────────────────────────────────────────────
+
+const DRUM_PRESETS = {
+    rock: {
+        label: 'Rock', steps: 16, pattern: [
+            [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+            [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ]
+    },
+    funk: {
+        label: 'Funk', steps: 16, pattern: [
+            [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
+            [1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+        ]
+    },
+    bossa: {
+        label: 'Bossa Nova', steps: 16, pattern: [
+            [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ]
+    },
+    trap: {
+        label: 'Trap', steps: 16, pattern: [
+            [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+            [1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1],
+            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+        ]
+    },
+    breakbeat: {
+        label: 'Breakbeat', steps: 16, pattern: [
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+            [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+        ]
+    },
+    eightOhEight: {
+        label: '808', steps: 16, pattern: [
+            [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+            [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ]
+    },
+};
 
 // ── Step Sequencer Engine ─────────────────────────────────────────────────────
 
 function scheduleDrumStep() {
     while (drumNextStepTime < audioCtx.currentTime + drumScheduleAhead) {
-        // Trigger sounds for this step
+        let swingOffset = 0;
+        if (drumSwing > 0 && drumCurrentStep % 2 === 1) {
+            const secondsPerBeat = 60.0 / drumBPM;
+            const secondsPerStep = secondsPerBeat / 4;
+            swingOffset = secondsPerStep * drumSwing * 0.33;
+        }
+        const schedTime = drumNextStepTime + swingOffset;
+
         for (let track = 0; track < DRUM_TRACKS.length; track++) {
-            if (drumPattern[track][drumCurrentStep]) {
-                drumSynths[DRUM_TRACKS[track]](drumNextStepTime);
+            if (drumPattern[track] && drumPattern[track][drumCurrentStep] && isTrackAudible(track)) {
+                drumSynths[DRUM_TRACKS[track]](schedTime);
             }
         }
 
-        // Notify UI of current step
         if (onDrumStepCallback) {
             const step = drumCurrentStep;
-            // Use setTimeout to sync visual with audio (approximate)
-            const msUntil = (drumNextStepTime - audioCtx.currentTime) * 1000;
+            const msUntil = (schedTime - audioCtx.currentTime) * 1000;
             setTimeout(() => onDrumStepCallback(step), Math.max(0, msUntil));
         }
 
-        // Advance
         const secondsPerBeat = 60.0 / drumBPM;
-        const secondsPerStep = secondsPerBeat / 4; // 16th notes
+        const secondsPerStep = secondsPerBeat / 4;
         drumNextStepTime += secondsPerStep;
         drumCurrentStep = (drumCurrentStep + 1) % DRUM_STEPS;
     }
@@ -1205,30 +1330,22 @@ function scheduleDrumStep() {
 
 export function startDrumSequencer() {
     if (!audioCtx || drumPlaying) return;
-
-    // Create drum gain node if needed
     if (!drumGain) {
         drumGain = audioCtx.createGain();
         drumGain.gain.setValueAtTime(drumVolume, audioCtx.currentTime);
         drumGain.connect(masterGain);
     }
-
     drumCurrentStep = 0;
     drumNextStepTime = audioCtx.currentTime;
     drumPlaying = true;
-
-    // Use setInterval for lookahead scheduler
     drumTimerID = setInterval(scheduleDrumStep, drumLookahead);
 }
 
 export function stopDrumSequencer() {
     drumPlaying = false;
-    if (drumTimerID !== null) {
-        clearInterval(drumTimerID);
-        drumTimerID = null;
-    }
+    if (drumTimerID !== null) { clearInterval(drumTimerID); drumTimerID = null; }
     drumCurrentStep = 0;
-    if (onDrumStepCallback) onDrumStepCallback(-1); // clear highlight
+    if (onDrumStepCallback) onDrumStepCallback(-1);
 }
 
 export function toggleDrumStep(track, step) {
@@ -1238,29 +1355,224 @@ export function toggleDrumStep(track, step) {
     return drumPattern[track][step];
 }
 
-export function getDrumPattern() {
-    return drumPattern;
-}
-
+export function getDrumPattern() { return drumPattern; }
 export function setDrumBPM(bpm) {
     drumBPM = Math.max(40, Math.min(240, bpm));
+    globalBPM = drumBPM;
+    if (onTempoChangeCallback) onTempoChangeCallback(globalBPM);
 }
 
 export function setDrumVolume(vol) {
     drumVolume = Math.max(0, Math.min(1, vol));
-    if (drumGain && audioCtx) {
-        drumGain.gain.setTargetAtTime(drumVolume, audioCtx.currentTime, 0.01);
-    }
+    if (drumGain && audioCtx) drumGain.gain.setTargetAtTime(drumVolume, audioCtx.currentTime, 0.01);
 }
 
 export function clearDrumPattern() {
     drumPattern = DRUM_TRACKS.map(() => new Array(DRUM_STEPS).fill(false));
 }
 
-export function isDrumPlaying() {
-    return drumPlaying;
+export function isDrumPlaying() { return drumPlaying; }
+export function setDrumStepCallback(cb) { onDrumStepCallback = cb; }
+
+// ── New Drum Exports ──────────────────────────────────────────────────────────
+
+export function getDrumTrackNames() { return [...DRUM_TRACKS]; }
+export function getDrumStepCount() { return DRUM_STEPS; }
+
+export function setDrumSwing(value) { drumSwing = Math.max(0, Math.min(1, value)); }
+
+export function setDrumStepCount(count) {
+    const newCount = count === 32 ? 32 : 16;
+    if (newCount === DRUM_STEPS) return;
+    const wasPlaying = drumPlaying;
+    if (wasPlaying) stopDrumSequencer();
+    const oldPattern = drumPattern;
+    DRUM_STEPS = newCount;
+    drumPattern = DRUM_TRACKS.map((_, t) => {
+        const row = new Array(DRUM_STEPS).fill(false);
+        for (let s = 0; s < Math.min(oldPattern[t].length, DRUM_STEPS); s++) row[s] = oldPattern[t][s];
+        return row;
+    });
+    if (wasPlaying) startDrumSequencer();
 }
 
-export function setDrumStepCallback(cb) {
-    onDrumStepCallback = cb;
+export function setDrumMute(track, muted) {
+    if (track >= 0 && track < DRUM_TRACKS.length) drumMute[track] = muted;
+}
+
+export function setDrumSolo(track, soloed) {
+    if (track >= 0 && track < DRUM_TRACKS.length) drumSolo[track] = soloed;
+}
+
+export function clearDrumSolos() { drumSolo.fill(false); }
+export function getDrumMuteState() { return [...drumMute]; }
+export function getDrumSoloState() { return [...drumSolo]; }
+
+export function loadDrumPreset(presetKey) {
+    const preset = DRUM_PRESETS[presetKey];
+    if (!preset) return false;
+    const wasPlaying = drumPlaying;
+    if (wasPlaying) stopDrumSequencer();
+    DRUM_STEPS = preset.steps;
+    drumPattern = preset.pattern.map(row => row.map(v => !!v));
+    while (drumPattern.length < DRUM_TRACKS.length) drumPattern.push(new Array(DRUM_STEPS).fill(false));
+    if (wasPlaying) startDrumSequencer();
+    return true;
+}
+
+export function getDrumPresetNames() {
+    return Object.entries(DRUM_PRESETS).map(([key, val]) => ({ key, label: val.label }));
+}
+
+// ── Global Tempo ──────────────────────────────────────────────────────────────
+
+export function setGlobalBPM(bpm) {
+    globalBPM = Math.max(40, Math.min(240, bpm));
+    drumBPM = globalBPM;
+    // Re-sync arp timing if active
+    if (arp.enabled && arpTimer) {
+        clearInterval(arpTimer);
+        arpTimer = setInterval(arpTick, arpRateMs());
+    }
+    if (onTempoChangeCallback) onTempoChangeCallback(globalBPM);
+}
+
+export function getGlobalBPM() { return globalBPM; }
+
+export function setTempoChangeCallback(cb) { onTempoChangeCallback = cb; }
+
+// ── Synth Presets ─────────────────────────────────────────────────────────────
+
+const SYNTH_PRESETS = {
+    init: {
+        label: 'Init',
+        waveform: 'sawtooth',
+        filter: { cutoff: 8000, q: 1, type: 'lowpass' },
+        distortion: { drive: 0 },
+        wah: { enabled: false, rate: 2, depth: 4000, baseFreq: 500 },
+        delay: { time: 0.3, feedback: 0.3, mix: 0 },
+        reverb: { mix: 0, decay: 1.5 },
+        adsr: { attack: 0.05, decay: 0.15, sustain: 0.6, release: 0.3 },
+        octaveShift: 0,
+    },
+    lead: {
+        label: 'Fat Lead',
+        waveform: 'sawtooth',
+        filter: { cutoff: 3500, q: 4, type: 'lowpass' },
+        distortion: { drive: 0.3 },
+        wah: { enabled: false, rate: 2, depth: 4000, baseFreq: 500 },
+        delay: { time: 0.35, feedback: 0.35, mix: 0.2 },
+        reverb: { mix: 0.15, decay: 1.2 },
+        adsr: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.2 },
+        octaveShift: 0,
+    },
+    pad: {
+        label: 'Lush Pad',
+        waveform: 'triangle',
+        filter: { cutoff: 2000, q: 0.5, type: 'lowpass' },
+        distortion: { drive: 0 },
+        wah: { enabled: false, rate: 0.5, depth: 2000, baseFreq: 300 },
+        delay: { time: 0.4, feedback: 0.4, mix: 0.3 },
+        reverb: { mix: 0.5, decay: 3.0 },
+        adsr: { attack: 0.5, decay: 0.3, sustain: 0.9, release: 1.0 },
+        octaveShift: 0,
+    },
+    pluck: {
+        label: 'Pluck',
+        waveform: 'sawtooth',
+        filter: { cutoff: 5000, q: 2, type: 'lowpass' },
+        distortion: { drive: 0 },
+        wah: { enabled: false, rate: 2, depth: 4000, baseFreq: 500 },
+        delay: { time: 0.25, feedback: 0.2, mix: 0.15 },
+        reverb: { mix: 0.2, decay: 1.0 },
+        adsr: { attack: 0.005, decay: 0.25, sustain: 0.1, release: 0.15 },
+        octaveShift: 0,
+    },
+    bass: {
+        label: 'Deep Bass',
+        waveform: 'sawtooth',
+        filter: { cutoff: 800, q: 6, type: 'lowpass' },
+        distortion: { drive: 0.2 },
+        wah: { enabled: false, rate: 2, depth: 4000, baseFreq: 500 },
+        delay: { time: 0.3, feedback: 0.1, mix: 0 },
+        reverb: { mix: 0, decay: 0.8 },
+        adsr: { attack: 0.01, decay: 0.2, sustain: 0.7, release: 0.15 },
+        octaveShift: -2,
+    },
+    bell: {
+        label: 'Crystal Bell',
+        waveform: 'sine',
+        filter: { cutoff: 12000, q: 0.5, type: 'lowpass' },
+        distortion: { drive: 0 },
+        wah: { enabled: false, rate: 2, depth: 4000, baseFreq: 500 },
+        delay: { time: 0.5, feedback: 0.45, mix: 0.35 },
+        reverb: { mix: 0.6, decay: 4.0 },
+        adsr: { attack: 0.001, decay: 0.8, sustain: 0.0, release: 1.5 },
+        octaveShift: 1,
+    },
+    acid: {
+        label: 'Acid Squelch',
+        waveform: 'square',
+        filter: { cutoff: 600, q: 12, type: 'lowpass' },
+        distortion: { drive: 0.5 },
+        wah: { enabled: true, rate: 4, depth: 5000, baseFreq: 200 },
+        delay: { time: 0.2, feedback: 0.3, mix: 0.1 },
+        reverb: { mix: 0.05, decay: 0.6 },
+        adsr: { attack: 0.005, decay: 0.15, sustain: 0.4, release: 0.1 },
+        octaveShift: -1,
+    },
+};
+
+export function loadSynthPreset(presetKey) {
+    const p = SYNTH_PRESETS[presetKey];
+    if (!p) return false;
+
+    // Waveform
+    waveform = p.waveform;
+
+    // Filter
+    if (filterNode) {
+        filterNode.frequency.setTargetAtTime(p.filter.cutoff, audioCtx.currentTime, 0.02);
+        filterNode.Q.setTargetAtTime(p.filter.q, audioCtx.currentTime, 0.02);
+        filterNode.type = p.filter.type;
+    }
+    effectParams.filter = { ...p.filter };
+
+    // Distortion
+    if (distortionNode) {
+        const k = p.distortion.drive;
+        const curve = new Float32Array(256);
+        for (let i = 0; i < 256; i++) {
+            const x = (i / 128) - 1;
+            curve[i] = k > 0 ? ((1 + k) * x) / (1 + k * Math.abs(x)) : x;
+        }
+        distortionNode.curve = curve;
+    }
+    effectParams.distortion = { ...p.distortion };
+
+    // Wah
+    effectParams.wah = { ...p.wah };
+
+    // Delay
+    if (delayNode) delayNode.delayTime.setTargetAtTime(p.delay.time, audioCtx.currentTime, 0.02);
+    effectParams.delay = { ...p.delay };
+
+    // Reverb
+    effectParams.reverb = { ...p.reverb };
+
+    // ADSR
+    effectParams.adsr = { ...p.adsr };
+
+    // Octave
+    effectParams.octaveShift = p.octaveShift;
+
+    return true;
+}
+
+export function getSynthPresetNames() {
+    return Object.entries(SYNTH_PRESETS).map(([key, val]) => ({ key, label: val.label }));
+}
+
+export function getCurrentSynthParams() {
+    return { waveform, ...effectParams };
 }
