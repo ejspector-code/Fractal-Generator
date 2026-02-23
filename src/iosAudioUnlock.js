@@ -103,20 +103,24 @@ function installListeners() {
     if (listenersInstalled) return;
     listenersInstalled = true;
     dlog('installListeners: adding gesture listeners');
-    const opts = { capture: true, passive: true };
+    const opts = { capture: true, passive: false };
     document.addEventListener('touchstart', onUserGesture, opts);
     document.addEventListener('touchend', onUserGesture, opts);
     document.addEventListener('click', onUserGesture, opts);
     document.addEventListener('keydown', onUserGesture, opts);
+    document.addEventListener('pointerdown', onUserGesture, opts);
+    document.addEventListener('mousedown', onUserGesture, opts);
 }
 
 function removeListeners() {
     if (!listenersInstalled) return;
     listenersInstalled = false;
-    const opts = { capture: true, passive: true };
+    const opts = { capture: true, passive: false };
     document.removeEventListener('touchstart', onUserGesture, opts);
     document.removeEventListener('touchend', onUserGesture, opts);
     document.removeEventListener('click', onUserGesture, opts);
     document.removeEventListener('keydown', onUserGesture, opts);
+    document.removeEventListener('pointerdown', onUserGesture, opts);
+    document.removeEventListener('mousedown', onUserGesture, opts);
 }
 

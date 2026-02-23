@@ -16,11 +16,30 @@ let ctx = null;
 function getCtx() {
     if (!ctx || ctx.state === 'closed') {
         ctx = new (window.AudioContext || window.webkitAudioContext)();
-        // Register for iOS unlock (silent buffer trick)
+
+        // 1. Synchronous resume attempt
+        if (ctx.state === 'suspended') {
+            ctx.resume();
+        }
+
+        // 2. Tiny silent buffer prime BEFORE scheduling synth nodes
+        try {
+            const buffer = ctx.createBuffer(1, 1, ctx.sampleRate || 22050);
+            const source = ctx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(ctx.destination);
+            source.start(0);
+            source.stop(ctx.currentTime + 0.001);
+        } catch (e) {
+            console.warn('Sync silent block failed:', e);
+        }
+
+        // 3. Register for async iOS unlock
         ensureUnlocked(ctx);
+    } else if (ctx.state === 'suspended') {
+        // Resume suspended context
+        ctx.resume();
     }
-    // Resume suspended context (browser autoplay policy)
-    if (ctx.state === 'suspended') ctx.resume();
     return ctx;
 }
 
