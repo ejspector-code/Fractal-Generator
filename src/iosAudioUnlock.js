@@ -22,22 +22,23 @@ export function unregisterContext(ctx) {
     contexts.delete(ctx);
 }
 
-async function unlockContext(ctx) {
+function unlockContextSync(ctx) {
     if (!ctx || ctx.state === 'closed') return false;
     if (ctx.state === 'running') {
         dlog('unlockContext: already running');
         return true;
     }
 
-    dlog(`unlockContext: state=${ctx.state}, attempting resume...`);
-    try {
-        await ctx.resume();
-        dlog(`unlockContext: after resume, state=${ctx.state}`);
-    } catch (e) {
-        dlog(`unlockContext: resume error: ${e.message}`);
-    }
+    dlog(`unlockContext: state=${ctx.state}, attempting sync resume...`);
 
-    // Play a silent buffer — key trick for iOS Safari
+    // 1. Sync resume attempt (fire and forget)
+    ctx.resume().then(() => {
+        dlog(`unlockContext: resume resolved, state=${ctx.state}`);
+    }).catch(e => {
+        dlog(`unlockContext: resume error: ${e.message}`);
+    });
+
+    // 2. Play a silent buffer SYNCHRONOUSLY — key trick for iOS Safari
     try {
         const buffer = ctx.createBuffer(1, 1, ctx.sampleRate || 22050);
         const source = ctx.createBufferSource();
@@ -50,53 +51,71 @@ async function unlockContext(ctx) {
         dlog(`unlockContext: silent buffer error: ${e.message}`);
     }
 
-    // One more resume attempt
+    // 3. One more sync resume attempt just in case
     if (ctx.state !== 'running') {
-        try {
-            await ctx.resume();
-            dlog(`unlockContext: 2nd resume, state=${ctx.state}`);
-        } catch (e) {
-            dlog(`unlockContext: 2nd resume error: ${e.message}`);
-        }
+        ctx.resume().catch(e => dlog(`unlockContext: 2nd resume error: ${e.message}`));
     }
 
-    dlog(`unlockContext: final state=${ctx.state}`);
     return ctx.state === 'running';
 }
 
-export async function ensureUnlocked(ctx) {
+export function ensureUnlocked(ctx) {
     if (!ctx) return;
     dlog(`ensureUnlocked: starting, ctx.state=${ctx.state}`);
     registerContext(ctx);
-    const ok = await unlockContext(ctx);
+    const ok = unlockContextSync(ctx);
     if (ok) unlocked = true;
     dlog(`ensureUnlocked: result=${ok}, unlocked=${unlocked}`);
-    return ok;
+    // Return a resolved promise for backwards compatibility since it used to be async
+    return Promise.resolve(ok);
 }
 
 export function isUnlocked() {
     return unlocked;
 }
 
-async function onUserGesture() {
+let dummyCtx = null;
+
+function onUserGesture() {
     dlog(`onUserGesture: ${contexts.size} contexts registered`);
+
+    // Safari Web Audio unlock: creating and syncing a dummy context on first interaction
+    // unlocks Web Audio globally for the entire page, resolving issues with async audio setups.
+    if (!dummyCtx && contexts.size === 0) {
+        dlog('onUserGesture: creating dummy context to globally unlock Web Audio');
+        try {
+            dummyCtx = new (window.AudioContext || window.webkitAudioContext)();
+            unlockContextSync(dummyCtx);
+            unlocked = true;
+        } catch (e) {
+            dlog(`onUserGesture: dummy context error: ${e.message}`);
+        }
+    }
+
     let anyRunning = false;
     for (const ctx of contexts) {
         if (ctx.state === 'closed') {
             contexts.delete(ctx);
             continue;
         }
-        const ok = await unlockContext(ctx);
-        if (ok) anyRunning = true;
+        const ok = unlockContextSync(ctx);
+        if (ok || ctx.state === 'running') anyRunning = true;
     }
-    if (anyRunning) {
-        unlocked = true;
-        const allRunning = [...contexts].every(c => c.state === 'running' || c.state === 'closed');
-        if (allRunning) {
+
+    // Check after a brief delay to see if contexts are actually running after resume promises resolve
+    setTimeout(() => {
+        let allRunning = true;
+        for (const ctx of contexts) {
+            if (ctx.state !== 'running' && ctx.state !== 'closed') {
+                allRunning = false;
+            }
+        }
+        if (allRunning && contexts.size > 0) {
+            unlocked = true;
             dlog('onUserGesture: all contexts running, removing listeners');
             removeListeners();
         }
-    }
+    }, 100);
 }
 
 function installListeners() {
@@ -123,4 +142,7 @@ function removeListeners() {
     document.removeEventListener('pointerdown', onUserGesture, opts);
     document.removeEventListener('mousedown', onUserGesture, opts);
 }
+
+// Automatically install listeners on script load to catch the very first interaction
+installListeners();
 
