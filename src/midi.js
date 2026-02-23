@@ -394,6 +394,7 @@ function rawNoteOff(note) {
 // ── Public noteOn / noteOff (with Scale Lock → Chord → Arp pipeline) ─────────
 
 export function noteOn(originalNote, velocity = 100) {
+    if (window.__audioDebugLog) window.__audioDebugLog(`noteOn(${originalNote}, ${velocity}) active=${active} hasCtx=${!!audioCtx} ctxState=${audioCtx?.state}`);
     if (!active || !audioCtx) return;
 
     // 1. Scale Lock
@@ -477,10 +478,18 @@ function connectMidiInputs() {
 export async function startMidi() {
     if (active) return { ok: true };
 
+    const dlog = (msg) => {
+        if (window.__audioDebugLog) window.__audioDebugLog(msg);
+        else console.log('[midi]', msg);
+    };
+
     try {
+        dlog('startMidi: creating AudioContext...');
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        dlog(`startMidi: AC created, state=${audioCtx.state}, sampleRate=${audioCtx.sampleRate}`);
         // iOS/iPadOS: unlock via silent buffer + resume (simple resume is not enough)
         await ensureUnlocked(audioCtx);
+        dlog(`startMidi: after ensureUnlocked, state=${audioCtx.state}`);
 
         // ── Build effects chain ──────────────────────────────────────────────
 

@@ -4,6 +4,7 @@
  */
 import p5 from 'p5';
 import './styles.css';
+import { debugLog } from './audioDebug.js';
 import { renderClassic, renderParticles, renderVapor, resetParticles, initClickBurst, renderClickBursts } from './renderer.js';
 import { Animator } from './animator.js';
 import { DEJONG_PRESETS, CLIFFORD_PRESETS, LORENZ_PRESETS, AIZAWA_PRESETS, BUDDHABROT_PRESETS, BURNINGSHIP_PRESETS, CURLNOISE_PRESETS, MANDELBROT_PRESETS } from './presets.js';
@@ -1242,19 +1243,25 @@ setTimeout(() => {
 
   // Auto-start MIDI: on iOS/iPadOS, defer until first user gesture to unlock AudioContext
   function autoStartMidi() {
+    debugLog('autoStartMidi: called');
     midiToggle.checked = true;
     midiToggle.onchange.call(midiToggle).then(() => {
+      debugLog('autoStartMidi: MIDI started successfully');
       const dc = document.getElementById('midi-drawer-content');
       const dt = document.getElementById('midi-drawer-toggle');
       dc.classList.add('open');
       dt.classList.add('open');
+    }).catch(err => {
+      debugLog(`autoStartMidi: ERROR: ${err.message}`);
     });
   }
 
   const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  debugLog(`isTouchDevice: ${isTouchDevice}`);
   if (isTouchDevice) {
     // Wait for first user gesture to unlock AudioContext on iOS
     const unlockAudio = () => {
+      debugLog('unlockAudio: first user gesture detected');
       document.removeEventListener('touchstart', unlockAudio);
       document.removeEventListener('click', unlockAudio);
       autoStartMidi();
