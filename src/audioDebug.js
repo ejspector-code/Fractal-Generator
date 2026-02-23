@@ -51,6 +51,73 @@ debugLog(`UA: ${navigator.userAgent.slice(0, 80)}`);
 debugLog(`Touch: ontouchstart=${'ontouchstart' in window} maxTouch=${navigator.maxTouchPoints}`);
 debugLog(`AudioContext: ${typeof AudioContext !== 'undefined' ? 'yes' : 'no'} webkit: ${typeof webkitAudioContext !== 'undefined' ? 'yes' : 'no'}`);
 
+// Add a Test Beep button
+const btn = document.createElement('button');
+btn.textContent = '🔊 TEST BEEP';
+Object.assign(btn.style, {
+    position: 'fixed',
+    top: '40px',
+    left: '10px',
+    zIndex: '999999',
+    padding: '12px 20px',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    background: '#ff4444',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+});
+btn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    debugLog('TEST BEEP button tapped');
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        debugLog(`Test AC created, state=${ctx.state}`);
+        ctx.resume().then(() => {
+            debugLog(`Test AC resumed, state=${ctx.state}`);
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = 440;
+            gain.gain.value = 0.5;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.5);
+            debugLog('Test beep playing now');
+        }).catch(err => {
+            debugLog(`Test AC resume failed: ${err.message}`);
+        });
+    } catch (err) {
+        debugLog(`Test beep error: ${err.message}`);
+    }
+}, { passive: false });
+btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    debugLog('TEST BEEP button clicked (mouse)');
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        ctx.resume().then(() => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = 440;
+            gain.gain.value = 0.5;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.5);
+            debugLog('Test beep playing now (mouse)');
+        });
+    } catch (err) {
+        debugLog(`Test beep error: ${err.message}`);
+    }
+});
+document.body.appendChild(btn);
+
 // Monkey-patch AudioContext to track all instances
 const OrigAC = window.AudioContext || window.webkitAudioContext;
 if (OrigAC) {

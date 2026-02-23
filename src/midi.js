@@ -626,6 +626,23 @@ export async function startMidi() {
 
         active = true;
 
+        // Play a direct test beep to verify audio output works
+        dlog('startMidi: playing test beep...');
+        try {
+            const testOsc = audioCtx.createOscillator();
+            const testGain = audioCtx.createGain();
+            testOsc.type = 'sine';
+            testOsc.frequency.value = 440;
+            testGain.gain.value = 0.3;
+            testOsc.connect(testGain);
+            testGain.connect(audioCtx.destination);
+            testOsc.start();
+            testOsc.stop(audioCtx.currentTime + 0.3);
+            dlog('startMidi: test beep scheduled');
+        } catch (beepErr) {
+            dlog(`startMidi: test beep FAILED: ${beepErr.message}`);
+        }
+
         // Try to connect MIDI hardware
         const devices = [];
         try {
